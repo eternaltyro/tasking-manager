@@ -1,14 +1,15 @@
 from server import db
-# from server.models.postgis.Project_Model import Project
+
 # from server.models.postgis.Organisation_Model import Organisation
 from server.models.postgis.user import User
 from server.models.dtos.campaign_dto import CampaignDTO
+# from server.models.postgis.project import Project
 
-# campaign_projects = db.Table(
-#     'campaign_projects', db.metadata,
-#     db.Column('campaign_id', db.Integer, db.ForeignKey('campaign.id'), nullable=False),
-#     db.Column('project_id', db.Integer, db.ForeignKey('project.id'), nullable=False)
-# )
+campaign_projects = db.Table(
+    'campaign_projects', db.metadata,
+    db.Column('campaign_id', db.Integer, db.ForeignKey('campaign.id')),
+    db.Column('project_id', db.Integer, db.ForeignKey('projects.id'))
+)
 
 # campaign_organisations = db.Table(
 #     'campaign_organisations', db.metadata,
@@ -32,10 +33,11 @@ class Campaign(db.Model):
     url = db.Column(db.String)
     description = db.Column(db.String)
     
-    # projects = db.relationship(
+    # project = db.relationship(
     #     Project,
     #     secondary=campaign_projects,
-    #     backref='campaign' 
+    #     # backref=db.backref('pages', lazy=True)
+    #     # backref='campaign' 
     # )
 
     # organisation = db.relationship(

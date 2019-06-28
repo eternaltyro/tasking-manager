@@ -40,9 +40,9 @@ class CampaignService:
         return campaign
 
     @staticmethod
-    def update_campaign(campaign_dto: CampaignDTO):
+    def update_campaign(campaign_dto: CampaignDTO, campaign_id: int):
         # campaign = Campaign.from_dto(campaign_dto)
-        campaign = Campaign.query.get(campaign_dto.id)
+        campaign = Campaign.query.get(campaign_id)
         campaign.update(campaign_dto)
         return campaign
 

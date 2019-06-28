@@ -25,6 +25,27 @@ class CampaignAPI(Resource):
             current_app.logger.critical(error_msg)
             return {"error": error_msg}, 500
 
+
+    def patch(self, campaign_id):
+
+        try:
+            campaign_dto = CampaignDTO(request.get_json())
+            campaign_dto.validate()
+        except DataError as e:
+            current_app.logger.error(f'error validating request: {str(e)}')
+            return str(e), 400
+
+        try:
+            campaign = CampaignService.update_campaign(campaign_dto, campaign_id)
+            return {campaign_dto.name:"Updated"}, 200
+        except NotFound:
+            return {"Error": "Campaign not found"}, 404
+        except Exception as e:
+            error_msg = f'User PATCH - unhandled error: {str(e)}'
+            current_app.logger.critical(error_msg)
+            return {"error": error_msg}, 500
+
+
     def post(self):
 
         try:
@@ -45,37 +66,5 @@ class CampaignAPI(Resource):
             current_app.logger.critical(error_msg)
             return {"error": error_msg}, 500
     
-    def patch(self):
-
-        try:
-            campaign_dto = CampaignDTO(request.get_json())
-            campaign_dto.validate()
-        except DataError as e:
-            current_app.logger.error(f'error validating request: {str(e)}')
-            return str(e), 400
-
-        try:
-            campaign = CampaignService.update_campaign(campaign_dto)
-            return {campaign_dto.name:"Updated"}, 200
-        except NotFound:
-            return {"Error": "Campaign not found"}, 404
-        except Exception as e:
-            error_msg = f'User PATCH - unhandled error: {str(e)}'
-            current_app.logger.critical(error_msg)
-            return {"error": error_msg}, 500
-
-
-# class GetAllCampaigns(Resource):
-
-#     def get(self):
-
-#         try:
-#             campaigns = CampaignService.get_all_campaigns()
-#             return campaigns.to_primitive(), 200
-#         except NotFound:
-#             return {"Error": "No campaign found"}, 404
-#         except Exception as e:
-#             error_msg = f'Messages GET all - unhandled error: {str(e)}'
-#             current_app.logger.critical(error_msg)
-#             return {"error": error_msg}, 500 
+    
 

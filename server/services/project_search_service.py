@@ -4,6 +4,7 @@ from shapely.geometry import Polygon, box
 from server.models.dtos.project_dto import ProjectSearchDTO, ProjectSearchResultsDTO, ListSearchResultDTO, \
     Pagination, ProjectSearchBBoxDTO
 from server.models.postgis.project import Project, ProjectInfo
+from server.models.postgis.campaign import Campaign
 from server.models.postgis.statuses import ProjectStatus, MappingLevel, MappingTypes, ProjectPriority
 from server.models.postgis.utils import NotFound, ST_Intersects, ST_MakeEnvelope, ST_Transform, ST_Area
 from server.services.users.user_service import UserService
@@ -76,7 +77,7 @@ class ProjectSearchService:
             list_dto.mapper_level = MappingLevel(project.mapper_level).name
             list_dto.short_description = project_info_dto.short_description
             list_dto.organisation_tag = project.organisation_tag
-            list_dto.campaign_tag = project.campaign_tag
+            # list_dto.campaign_tag = project.campaign_tag
             list_dto.percent_mapped = round(
                 ((project.tasks_mapped + project.tasks_bad_imagery) / project.total_tasks) * 100, 0)
             list_dto.percent_validated = round(
@@ -98,7 +99,7 @@ class ProjectSearchService:
                                  Project.default_locale,
                                  Project.centroid.ST_AsGeoJSON().label('centroid'),
                                  Project.organisation_tag,
-                                 Project.campaign_tag,
+                                #  Project.campaign_tag,
                                  Project.tasks_bad_imagery,
                                  Project.tasks_mapped,
                                  Project.tasks_validated,
@@ -122,11 +123,11 @@ class ProjectSearchService:
         if search_dto.mapper_level and search_dto.mapper_level.upper() != 'ALL':
             query = query.filter(Project.mapper_level == MappingLevel[search_dto.mapper_level].value)
 
-        if search_dto.organisation_tag:
-            query = query.filter(Project.organisation_tag == search_dto.organisation_tag)
+        # if search_dto.organisation_tag:
+        #     query = query.filter(Project.organisation_tag == search_dto.organisation_tag)
 
-        if search_dto.campaign_tag:
-            query = query.filter(Project.campaign_tag == search_dto.campaign_tag)
+        if search_dto.campaign:
+            query = query.join(Campaign, Project.campaign).filter(Campaign.name==search_dto.campaign)
 
         if search_dto.mapping_types:
             # Construct array of mapping types for query

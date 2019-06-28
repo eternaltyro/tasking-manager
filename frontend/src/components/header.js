@@ -25,8 +25,10 @@ class Header extends React.Component {
     const linkCombo = "link ph3 barlow-condensed blue-dark f4 ttu";
     return(
       <div className="v-mid">
-        {this.menuItems.map(
-          item => <Link to={item.link} className={ linkCombo }>{item.label}</Link>
+        {this.menuItems.map((item, n) =>
+          <Link to={item.link} key={n} className={ linkCombo }>
+            {item.label}
+          </Link>
         )}
       </div>
     );
@@ -36,8 +38,12 @@ class Header extends React.Component {
     const linkCombo = "link ph3 barlow-condensed blue-dark f4 ttu";
     return(
       <div className="v-mid tc">
-        {this.menuItems.map(
-          item => <p><Link to={item.link} className={ linkCombo }>{item.label}</Link></p>
+        {this.menuItems.map((item, n) =>
+          <p key={n}>
+            <Link to={item.link} className={ linkCombo }>
+              {item.label}
+            </Link>
+          </p>
         )}
         <a href={`${API_URL}auth/login?redirect_to=/login/`} className="mh1 mv2 dib">
           <Button className="bg-red white">Log in</Button>

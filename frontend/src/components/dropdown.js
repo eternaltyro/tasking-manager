@@ -47,9 +47,7 @@ class DropdownContent extends React.PureComponent {
   };
   render() {
     return (
-      <div
-        className={`di tl mt1 ba b--grey-light br1 fixed shadow-1 z-1 flex flex-column ${this.props.widthClass || ''}`}
-      >
+      <div className="di tl mt1 ba b--grey-light br1 fixed shadow-1 z-1 flex flex-column">
         {this.props.options.map((i, k) =>
           <span
             key={k}
@@ -102,7 +100,6 @@ class DropdownContent extends React.PureComponent {
 export class _Dropdown extends React.PureComponent {
   props: {
     className: string,
-    minWidth: string,
     disabled: boolean,
     value: Array<Object>,
     onChange: (Array<Object>) => any,
@@ -141,7 +138,7 @@ export class _Dropdown extends React.PureComponent {
         <Button
           icon={faChevronDown}
           onClick={this.toggleDropdown}
-          className={`${this.props.widthClass || ''} ${this.props.className || ''}`}
+          className={`${this.props.className || ''}`}
         >
           {this.props.display}
         </Button>
@@ -150,7 +147,6 @@ export class _Dropdown extends React.PureComponent {
             {...this.props}
             eventTypes={['click', 'touchend']}
             toggleDropdown={this.toggleDropdown}
-            widthClass={this.props.widthClass}
           />}
       </div>
     );

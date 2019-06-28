@@ -631,8 +631,8 @@
          * Get the user for a search value
          * @param searchValue
          */
-        vm.getUser = function(searchValue){
-            var resultsPromise = userService.searchUser(searchValue, vm.project.id);
+        vm.getUser = function(searchValue, isProjectManager=false){
+            var resultsPromise = userService.searchUser(searchValue, vm.project.id, isProjectManager);
             return resultsPromise.then(function (data) {
                 // On success
                 return data.usernames;

@@ -84,13 +84,13 @@ class Header extends React.Component {
               value={this.props.userPreferences.language || 'English'}
               options={[{label: 'English'}, {label: 'Portuguese (pt)'}]}
               display={this.props.userPreferences.language || 'Language'}
-              className="blue-dark bg-white mr1 dn dib-l"
+              className="blue-dark bg-white mr1 v-mid dn dib-l"
             />
-            <a href={`${API_URL}auth/login?redirect_to=/login/`} className="mh1 dn dib-ns">
+            <a href={`${API_URL}auth/login?redirect_to=/login/`} className="mh1 v-mid dn dib-ns">
               <Button className="blue-dark bg-white">Log in</Button>
             </a>
-            <Button className="bg-blue-dark white ml1 dn dib-ns">Sign in</Button>
-            <div className="dib dn-l">
+            <Button className="bg-blue-dark white ml1 v-mid dn dib-ns">Sign in</Button>
+            <div className="dib v-mid dn-l">
               <Popup
                 trigger={<BurgerMenu />}
                 modal

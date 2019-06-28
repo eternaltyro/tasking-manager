@@ -37,6 +37,8 @@ services:
   postgresql:
     image: mdillon/postgis:9.6
     container_name: postgresql
+    ports:
+      - "5433:5432"
     env_file: tasking-manager.env
     # logging:
     #   driver: none

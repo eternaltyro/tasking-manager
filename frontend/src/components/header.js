@@ -15,41 +15,46 @@ import { BurgerMenu } from './burgerMenu';
 
 class Header extends React.Component {
   renderMenuItens() {
+    const linkCombo = "link ph3 barlow-condensed blue-dark f4 ttu";
     return(
-      <ul>
-        <li><Link to={'/projects'}>Explore projects</Link></li>
-        <li><Link to={'/learn'}>How it works</Link></li>
-        <li><Link to={'/about'}>About</Link></li>
-        <li><Link to={'/help'}>Help</Link></li>
-      </ul>
+      <div className="v-mid">
+        <Link to={'/projects'} className={ linkCombo }>Explore projects</Link>
+        <Link to={'/learn'} className={ linkCombo }>How it works</Link>
+        <Link to={'/about'} className={ linkCombo }>About</Link>
+        <Link to={'/help'} className={ linkCombo }>Help</Link>
+      </div>
     );
   }
   render() {
     return (
-      <header>
-        <div className="grid-2 top-header mb-neg6 border-b border-b--2 border-b--lightgray">
-          <div className="header-slogan">
-            <span className="txt--red txt-m special-font ml24">Mapping our world together</span>
+      <header className="w-100">
+        <div className="cf ph2 bb b--grey-light red pt3 pb2">
+          <div className="fl w-50">
+            <span className="barlow-condensed f5 ml2 ">Mapping our world together</span>
           </div>
-          <div className="header-org-link">
-            <a className="txt--red txt-m mr24" href={`http://${ORG_URL}`}>
+          <div className="tr">
+            <a className="link red f6 mr2" href={`http://${ORG_URL}`}>
               {ORG_URL} <FontAwesomeIcon icon={faExternalLinkAlt} />
             </a>
           </div>
         </div>
-        <div className="mt18 main-header-line">
-          <div className="header-brand align-middle">
-            <img src={logo} alt={`${ORG_NAME} logo`} className="ml24 align-middle"
-              style={{width: '54px'}}
-              />
-            <span className="tm-title ml12 txt--secondary align-middle special-font">
-              Tasking Manager
-            </span>
+        <div className="mt3 mb2 mh2 header-grid">
+          <div className="cf fl grid-area-a">
+            <Link to={'/'} className="link mv-1">
+              <img src={logo} alt={`${ORG_NAME} logo`} className="ml2 v-mid pb2"
+                style={{width: '54px'}}
+                />
+              <span className="barlow-condensed f3 fw6 ml2 blue-dark">
+                Tasking Manager
+              </span>
+            </Link>
           </div>
-          <nav className="header-menu special-font txt--secondary align-middle hidden-on-large-down">
+
+          <nav className="grid-area-b mv1">
             { this.renderMenuItens() }
           </nav>
-          <div className="header-user btn-group btn-group--sidebyside align-r mr24">
+
+          <div className="fr grid-area-c tr">
             <Dropdown
               onAdd={() => {}}
               onRemove={() => {}}
@@ -57,22 +62,21 @@ class Header extends React.Component {
               value={this.props.userPreferences.language || 'English'}
               options={[{label: 'English'}, {label: 'Portuguese (pt)'}]}
               display={this.props.userPreferences.language || 'Language'}
-              className="btn-tertiary hidden-on-xlarge-down"
-              widthClass="w160"
+              className="blue-dark bg-white mr1 dn dib-l"
             />
-          <a href={`${API_URL}auth/login?redirect_to=/login/`} className="hidden-on-xsmall-only">
-            <Button className="btn-tertiary">Log in</Button>
-          </a>
-          <Button className="btn-secondary hidden-on-xsmall-only">Sign in</Button>
-          <div className="hidden-on-large-up">
-            <Popup
-              trigger={<BurgerMenu className="btn btn-tertiary align-middle"/>}
-              modal
-              closeOnDocumentClick
-              >
-              <div>{ this.renderMenuItens() }</div>
-            </Popup>
-          </div>
+          <a href={`${API_URL}auth/login?redirect_to=/login/`} className="mh1 dn dib-ns">
+              <Button className="blue-dark bg-white">Log in</Button>
+            </a>
+            <Button className="bg-blue-dark white ml1 dn dib-ns">Sign in</Button>
+            <div className="dib dn-l">
+              <Popup
+                trigger={<BurgerMenu />}
+                modal
+                closeOnDocumentClick
+                >
+                <div>{ this.renderMenuItens() }</div>
+              </Popup>
+            </div>
           </div>
         </div>
       </header>

@@ -9,9 +9,9 @@ import { Login } from './views/login';
 
 function App() {
   return (
-    <div className="App">
+    <div className="App w-100 base-font">
       <Header />
-      <div>
+      <div className="cf w-100 base-font">
         <Route exact path="/" component={ Home } />
         <Route path="/about" component={ AboutPage } />
         <Route path="/login" component={ Login } />

@@ -14,17 +14,39 @@ import { BurgerMenu } from './burgerMenu';
 
 
 class Header extends React.Component {
-  renderMenuItens() {
+  menuItems = [
+    {label: "Explore projects", link: "/projects"},
+    {label: "How it works", link: "/learn"},
+    {label: "About", link: "/about"},
+    {label: "Help", link: "/help"}
+  ];
+
+  renderMenuItems() {
     const linkCombo = "link ph3 barlow-condensed blue-dark f4 ttu";
     return(
       <div className="v-mid">
-        <Link to={'/projects'} className={ linkCombo }>Explore projects</Link>
-        <Link to={'/learn'} className={ linkCombo }>How it works</Link>
-        <Link to={'/about'} className={ linkCombo }>About</Link>
-        <Link to={'/help'} className={ linkCombo }>Help</Link>
+        {this.menuItems.map(
+          item => <Link to={item.link} className={ linkCombo }>{item.label}</Link>
+        )}
       </div>
     );
   }
+
+  renderPopupItems() {
+    const linkCombo = "link ph3 barlow-condensed blue-dark f4 ttu";
+    return(
+      <div className="v-mid tc">
+        {this.menuItems.map(
+          item => <p><Link to={item.link} className={ linkCombo }>{item.label}</Link></p>
+        )}
+        <a href={`${API_URL}auth/login?redirect_to=/login/`} className="mh1 mv2 dib">
+          <Button className="bg-red white">Log in</Button>
+        </a>
+        <Button className="bg-blue-dark white mh1 mv2 dib">Sign in</Button>
+      </div>
+    );
+  }
+
   render() {
     return (
       <header className="w-100">
@@ -51,7 +73,7 @@ class Header extends React.Component {
           </div>
 
           <nav className="grid-area-b mv1">
-            { this.renderMenuItens() }
+            { this.renderMenuItems() }
           </nav>
 
           <div className="fr grid-area-c tr">
@@ -64,7 +86,7 @@ class Header extends React.Component {
               display={this.props.userPreferences.language || 'Language'}
               className="blue-dark bg-white mr1 dn dib-l"
             />
-          <a href={`${API_URL}auth/login?redirect_to=/login/`} className="mh1 dn dib-ns">
+            <a href={`${API_URL}auth/login?redirect_to=/login/`} className="mh1 dn dib-ns">
               <Button className="blue-dark bg-white">Log in</Button>
             </a>
             <Button className="bg-blue-dark white ml1 dn dib-ns">Sign in</Button>
@@ -74,7 +96,7 @@ class Header extends React.Component {
                 modal
                 closeOnDocumentClick
                 >
-                <div>{ this.renderMenuItens() }</div>
+                <div>{ this.renderPopupItems() }</div>
               </Popup>
             </div>
           </div>

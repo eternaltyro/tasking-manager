@@ -1,4 +1,4 @@
-import { API_URL } from '../config';
+import { API_URL, ID_EDITOR_URL, POTLATCH2_EDITOR_URL } from '../config';
 import { getCentroidAndZoomFromSelectedTasks, getSelectedTasksBBox } from './tasksGeometry';
 
 export function openEditor(
@@ -8,7 +8,6 @@ export function openEditor(
   selectedTasks,
   windowSize,
   windowObjectReference,
-  locale,
 ) {
   if (editor === 'JOSM') {
     sendJosmCommands(project, tasks, selectedTasks, windowSize);
@@ -16,7 +15,7 @@ export function openEditor(
   }
   const { center, zoom } = getCentroidAndZoomFromSelectedTasks(tasks, selectedTasks, windowSize);
   if (editor === 'ID') {
-    return getIdUrl(project, center, zoom, selectedTasks, locale, '?editor=ID');
+    return getIdUrl(project, center, zoom, selectedTasks, '?editor=ID');
   }
   if (windowObjectReference == null || windowObjectReference.closed) {
     windowObjectReference = window.open('', `iD-${project}-${selectedTasks}`);
@@ -31,15 +30,15 @@ export function openEditor(
   }
   if (editor === 'CUSTOM') {
     const customUrl = project.customEditor.url;
-    windowObjectReference.location.href = getIdUrl(
-      project,
-      center,
-      zoom,
-      selectedTasks,
-      locale,
-      customUrl,
-    );
+    windowObjectReference.location.href = getIdUrl(project, center, zoom, selectedTasks, customUrl);
     return '?editor=CUSTOM';
+  }
+}
+
+export function formatImageryUrl(imageryURL) {
+  // url is supposed to look like tms[22]:http://hiu...
+  if (imageryURL) {
+    return imageryURL.substring(imageryURL.indexOf('http')).replace('zoom', 'z');
   }
 }
 
@@ -47,7 +46,7 @@ export function getTaskGpxUrl(projectId, selectedTasks) {
   return new URL(
     `projects/${projectId}/tasks/queries/gpx/?tasks=${selectedTasks.join(',')}`,
     API_URL,
-  );
+  ).href;
 }
 
 export function getTaskXmlUrl(projectId, selectedTasks) {
@@ -66,33 +65,32 @@ export function getFieldPapersUrl(centroid, zoomLevel) {
 }
 
 export function getPotlatch2Url(centroid, zoomLevel) {
-  return `https://www.openstreetmap.org/edit?editor=potlatch2#map=${[
+  return `${POTLATCH2_EDITOR_URL}#map=${[
     zoomLevel,
     roundToDecimals(centroid[1], 5),
     roundToDecimals(centroid[0], 5),
   ].join('/')}`;
 }
 
-export function getIdUrl(project, centroid, zoomLevel, selectedTasks, locale = 'en', customUrl) {
-  const base = customUrl
-    ? formatCustomUrl(customUrl)
-    : 'https://www.openstreetmap.org/edit?editor=id&';
+export function getIdUrl(project, centroid, zoomLevel, selectedTasks, customUrl) {
+  const base = customUrl ? formatCustomUrl(customUrl) : `${ID_EDITOR_URL}`;
   let url = base + '#map=' + [zoomLevel, centroid[1], centroid[0]].join('/');
-  if (project.changesetComment) {
-    url += '&comment=' + encodeURIComponent(project.changesetComment);
+  // the other URL params are only needed by external iD editors
+  if (customUrl !== '?editor=ID') {
+    if (project.changesetComment) {
+      url += '&comment=' + encodeURIComponent(project.changesetComment);
+    }
+    if (project.imagery && project.imagery.includes('http')) {
+      url += '&background=custom:' + encodeURIComponent(formatImageryUrl(project.imagery));
+    }
+    // add GPX
+    if (project.projectId && selectedTasks) {
+      url += '&gpx=' + encodeURIComponent(getTaskGpxUrl(project.projectId, selectedTasks));
+    }
+    if (project.idPresets) {
+      url += '&presets=' + encodeURIComponent(project.idPresets.join(','));
+    }
   }
-  if (project.imagery && project.imagery.includes('http')) {
-    // url is supposed to look like tms[22]:http://hiu...
-    let urlForImagery = project.imagery.substring(project.imagery.indexOf('http'));
-    urlForImagery = urlForImagery.replace('zoom', 'z');
-    url += '&background=custom:' + encodeURIComponent(urlForImagery);
-  }
-  // add GPX
-  if (project.projectId && selectedTasks) {
-    url += '&gpx=' + encodeURIComponent(getTaskGpxUrl(project.projectId, selectedTasks).href);
-  }
-  // add hardcoded locale while we solve how to load the user locale on iD
-  url += '&locale=' + locale;
   return url;
 }
 
@@ -100,8 +98,12 @@ export const sendJosmCommands = async (project, tasks, selectedTasks, windowSize
   await loadTasksBoundaries(project, selectedTasks);
   await loadImageryonJosm(project);
   await selectedTasks.map(
-    async (task) =>
-      await loadOsmDataToTasks(project, taskBbox ? taskBbox : getSelectedTasksBBox(tasks, [task])),
+    async (task, n) =>
+      await loadOsmDataToTasks(
+        project,
+        taskBbox ? taskBbox : getSelectedTasksBBox(tasks, [task]),
+        n === 0 ? true : false,
+      ),
   );
   return true;
 };
@@ -127,20 +129,39 @@ function loadTasksBoundaries(project, selectedTasks) {
   );
 }
 
+export function getImageryInfo(url) {
+  const type = url.toLowerCase().substr(0, 3) === 'wms' ? 'wms' : 'tms';
+  const zoom = url.substr(url.indexOf('[') + 1, url.indexOf(']') - url.indexOf('[') - 1);
+  const [minZoom, maxZoom] = zoom.length
+    ? zoom.indexOf(':') !== -1
+      ? zoom.split(':')
+      : [null, zoom]
+    : [null, null];
+  return [
+    type,
+    minZoom !== '' && minZoom !== null ? Number(minZoom) : null,
+    maxZoom !== '' && maxZoom !== null ? Number(maxZoom) : null,
+  ];
+}
+
 function loadImageryonJosm(project) {
   if (project.imagery && project.imagery.includes('http')) {
+    const [type, minZoom, maxZoom] = getImageryInfo(project.imagery);
     const imageryParams = {
       title: project.imagery,
-      type: project.imagery.toLowerCase().substring(0, 3),
-      url: project.imagery,
+      type: type,
     };
+    if (minZoom) imageryParams.min_zoom = minZoom;
+    if (maxZoom) imageryParams.max_zoom = maxZoom;
+    imageryParams.url = project.imagery.substr(project.imagery.indexOf('http'));
+
     return callJosmRemoteControl(formatJosmUrl('imagery', imageryParams));
   }
 }
 
-function loadOsmDataToTasks(project, bbox) {
+function loadOsmDataToTasks(project, bbox, newLayer) {
   const emptyOSMLayerParams = {
-    new_layer: true,
+    new_layer: newLayer,
     layer_name: 'OSM Data',
     data: '<?xml version="1.0" encoding="utf8"?><osm generator="JOSM" version="0.6"></osm>',
   };

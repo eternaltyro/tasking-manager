@@ -5,10 +5,11 @@ import { FormattedMessage, FormattedNumber, FormattedRelativeTime } from 'react-
 import { selectUnit } from '@formatjs/intl-utils';
 import { useCopyClipboard } from '@lokibai/react-use-copy-clipboard';
 import ReactPlaceholder from 'react-placeholder';
+import { OSM_SERVER_URL } from '../../config';
 
 import messages from './messages';
 import { MappingIcon, ClipboardIcon } from '../svgIcons';
-import { UserInterestsForm } from './forms';
+import { UserInterestsForm } from './forms/interests';
 
 export function APIKeyCard({ token }) {
   //eslint-disable-next-line
@@ -86,7 +87,7 @@ export function OSMCard({ username }: Object) {
         <div className="w-100 w-50-ns fl">
           <a
             className="link red pb2"
-            href={`https://www.openstreetmap.org/user/${username}/account`}
+            href={`${OSM_SERVER_URL}/user/${username}/account`}
             target="_blank"
             rel="noopener noreferrer"
           >

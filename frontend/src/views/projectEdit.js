@@ -1,6 +1,6 @@
 import React, { useState, useLayoutEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Redirect, navigate } from '@reach/router';
+import { Redirect } from '@reach/router';
 import ReactPlaceholder from 'react-placeholder';
 import { FormattedMessage } from 'react-intl';
 
@@ -16,6 +16,7 @@ import { SettingsForm } from '../components/projectEdit/settingsForm';
 import { ActionsForm } from '../components/projectEdit/actionsForm';
 import { CustomEditorForm } from '../components/projectEdit/customEditorForm';
 import { Button } from '../components/button';
+import { Dropdown } from '../components/dropdown';
 import { fetchLocalJSONAPI, pushToLocalJSONAPI } from '../network/genericJSONRequest';
 import { useSetTitleTag } from '../hooks/UseMetaTags';
 import { useEditProjectAllowed } from '../hooks/UsePermissions';
@@ -24,7 +25,7 @@ import { CheckIcon, CloseIcon } from '../components/svgIcons';
 export const StateContext = React.createContext();
 
 export const styleClasses = {
-  divClass: 'w-70-l w-100 pb5 mb4 bb b--grey-light',
+  divClass: 'w-70-l w-100 pb4 mb3',
   labelClass: 'f4 fw6 db mb3',
   pClass: 'db mb3 f5',
   inputClass: 'w-80 pa2 db mb2',
@@ -52,7 +53,6 @@ export function ProjectEdit({ id }) {
   useSetTitleTag(`Edit project #${id}`);
   const mandatoryFields = ['name', 'shortDescription', 'description', 'instructions'];
   const token = useSelector((state) => state.auth.get('token'));
-  const user = useSelector((state) => state.auth.get('userDetails'));
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [languages, setLanguages] = useState(null);
@@ -132,20 +132,18 @@ export function ProjectEdit({ id }) {
       { value: 'permissions' },
       { value: 'settings' },
       { value: 'actions' },
-      { value: 'custom_editor', expert_required: true },
+      { value: 'custom_editor' },
     ];
 
     return (
       <div>
         <ul className="list pl0 mt0 ttu">
-          {elements
-            .filter((elm) => !elm.expert_required || user.isExpert)
-            .map((elm, n) => (
-              <li key={n} className={checkSelected(elm.value)} onClick={() => setOption(elm.value)}>
-                <FormattedMessage {...messages[`projectEditSection_${elm.value}`]} />
-                {elm.required && ' *'}
-              </li>
-            ))}
+          {elements.map((elm, n) => (
+            <li key={n} className={checkSelected(elm.value)} onClick={() => setOption(elm.value)}>
+              <FormattedMessage {...messages[`projectEditSection_${elm.value}`]} />
+              {elm.required && ' *'}
+            </li>
+          ))}
         </ul>
       </div>
     );
@@ -291,7 +289,7 @@ export function ProjectEdit({ id }) {
       message = <ServerMessage />;
     }
 
-    return <div className="db mt3">{message}</div>;
+    return <div className="db mv3">{message}</div>;
   };
 
   return (
@@ -307,13 +305,38 @@ export function ProjectEdit({ id }) {
           className="pr3"
         >
           {renderList()}
-          <Button onClick={saveChanges} className="bg-red white">
+          <Button onClick={saveChanges} className="db bg-red white pa3 bn">
             <FormattedMessage {...messages.save} />
           </Button>
-          <Button onClick={() => navigate(`/projects/${id}`)} className="bg-white blue-dark ml2">
-            <FormattedMessage {...messages.goToProjectPage} />
-          </Button>
-          <UpdateMessage error={error} success={success} />
+          <div style={{ minHeight: '3rem' }}>
+            <UpdateMessage error={error} success={success} />
+          </div>
+          <span className="db">
+            <Dropdown
+              onAdd={() => {}}
+              onRemove={() => {}}
+              value={null}
+              options={[
+                {
+                  label: <FormattedMessage {...messages.projectPage} />,
+                  href: `/projects/${projectInfo.projectId}/`,
+                  internalLink: true,
+                },
+                {
+                  label: <FormattedMessage {...messages.tasksPage} />,
+                  href: `/projects/${projectInfo.projectId}/tasks/`,
+                  internalLink: true,
+                },
+                {
+                  label: <FormattedMessage {...messages.projectStats} />,
+                  href: `/projects/${projectInfo.projectId}/stats/`,
+                  internalLink: true,
+                },
+              ]}
+              display={<FormattedMessage {...messages.accessProject} />}
+              className={'ba b--grey-light bg-white mr1 f5 v-mid pv2 ph3'}
+            />
+          </span>
         </ReactPlaceholder>
       </div>
       <ReactPlaceholder

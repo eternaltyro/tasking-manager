@@ -2,15 +2,27 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, redirect
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_oauthlib.client import OAuth
 from flask_restful import Api
 from flask_sqlalchemy import SQLAlchemy
 
-
 from backend.config import EnvironmentConfig
+
+
+def sentry_init():
+    """Initialize sentry.io event tracking"""
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+
+    sentry_sdk.init(
+        dsn=EnvironmentConfig.SENTRY_BACKEND_DSN,
+        environment=EnvironmentConfig.ENVIRONMENT,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=0.1,
+    )
 
 
 def format_url(endpoint):
@@ -33,12 +45,11 @@ def create_app(env=None):
     Bootstrap function to initialise the Flask app and config
     :return: Initialised Flask app
     """
+    # If SENTRY_BACKEND_DSN is configured, init sentry_sdk tracking
+    if EnvironmentConfig.SENTRY_BACKEND_DSN:
+        sentry_init()
 
-    app = Flask(
-        __name__,
-        static_folder="../frontend/build/static",
-        template_folder="../frontend/build",
-    )
+    app = Flask(__name__, template_folder="services/messaging/templates/")
 
     # Load configuration options from environment
     app.config.from_object("backend.config.EnvironmentConfig")
@@ -52,25 +63,11 @@ def create_app(env=None):
     db.init_app(app)
     migrate.init_app(app, db)
 
-    app.logger.debug("Initialising frontend routes")
+    app.logger.debug("Add root redirect route")
 
-    # Main route to frontend
     @app.route("/")
-    def index():
-        return render_template("index.html")
-
-    @app.route("/<path:text>")
-    def assets(text):
-        if "service-worker.js" in text:
-            return send_from_directory(app.template_folder, text)
-        elif "precache-manifest" in text:
-            return send_from_directory(app.template_folder, text)
-        elif "manifest.json" in text:
-            return send_from_directory(app.template_folder, text)
-        elif "favicon" in text:
-            return send_from_directory(app.template_folder, text)
-        else:
-            return render_template("index.html")
+    def index_redirect():
+        return redirect(format_url("system/heartbeat/"), code=302)
 
     # Add paths to API endpoints
     add_api_endpoints(app)
@@ -81,7 +78,7 @@ def create_app(env=None):
     # Add basic oauth setup
     app.secret_key = app.config[
         "SECRET_KEY"
-    ]  # Required by itsdangeroud, Flask-OAuthlib for creating entropy
+    ]  # Required by itsdangerous, Flask-OAuthlib for creating entropy
     oauth.init_app(app)
 
     return app
@@ -225,13 +222,18 @@ def add_api_endpoints(app):
 
     # Teams API endpoint
     from backend.api.teams.resources import TeamsRestAPI, TeamsAllAPI
-    from backend.api.teams.actions import TeamsActionsJoinAPI, TeamsActionsLeaveAPI
+    from backend.api.teams.actions import (
+        TeamsActionsJoinAPI,
+        TeamsActionsLeaveAPI,
+        TeamsActionsMessageMembersAPI,
+    )
 
     # Notifications API endpoint
     from backend.api.notifications.resources import (
         NotificationsRestAPI,
         NotificationsAllAPI,
         NotificationsQueriesCountUnreadAPI,
+        NotificationsQueriesPostUnreadAPI,
     )
     from backend.api.notifications.actions import NotificationsActionsDeleteMultipleAPI
 
@@ -446,7 +448,9 @@ def add_api_endpoints(app):
 
     # Tasks queries endoints (TODO: Refactor them into the REST endpoints)
     api.add_resource(
-        TasksQueriesJsonAPI, format_url("projects/<int:project_id>/tasks/")
+        TasksQueriesJsonAPI,
+        format_url("projects/<int:project_id>/tasks/"),
+        methods=["GET", "DELETE"],
     )
     api.add_resource(
         TasksQueriesXmlAPI, format_url("projects/<int:project_id>/tasks/queries/xml/")
@@ -638,6 +642,10 @@ def add_api_endpoints(app):
         endpoint="leave_team",
         methods=["POST"],
     )
+    api.add_resource(
+        TeamsActionsMessageMembersAPI,
+        format_url("teams/<int:team_id>/actions/message-members/"),
+    )
 
     # Campaigns REST endpoints
     api.add_resource(
@@ -667,7 +675,11 @@ def add_api_endpoints(app):
         NotificationsQueriesCountUnreadAPI,
         format_url("notifications/queries/own/count-unread/"),
     )
-
+    api.add_resource(
+        NotificationsQueriesPostUnreadAPI,
+        format_url("notifications/queries/own/post-unread/"),
+        methods=["POST"],
+    )
     # Notifications Actions endpoints
     api.add_resource(
         NotificationsActionsDeleteMultipleAPI,
@@ -757,7 +769,9 @@ def add_api_endpoints(app):
         SystemAuthenticationEmailAPI, format_url("system/authentication/email/")
     )
     api.add_resource(
-        SystemImageUploadRestAPI, format_url("system/image-upload/"), methods=["POST"],
+        SystemImageUploadRestAPI,
+        format_url("system/image-upload/"),
+        methods=["POST"],
     )
     api.add_resource(
         SystemApplicationsRestAPI,

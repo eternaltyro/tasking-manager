@@ -3,12 +3,16 @@ export const API_VERSION = process.env.REACT_APP_API_VERSION || 'v2';
 export const API_URL = process.env.REACT_APP_API_URL
   ? new URL('/api/' + API_VERSION + '/', process.env.REACT_APP_API_URL)
   : 'http://127.0.0.1:5000/api/' + API_VERSION + '/';
-export const EDITS_API_URL =
-  process.env.REACT_APP_EDITS_API_URL ||
-  'https://osm-stats-production-api.azurewebsites.net/stats/hotosm';
+export const HOMEPAGE_STATS_API_URL =
+  process.env.REACT_APP_HOMEPAGE_STATS_API_URL ||
+  'https://osmstats-api.hotosm.org/wildcard/?key=hotosm-project-*';
+export const USER_STATS_API_URL =
+  process.env.REACT_APP_USER_STATS_API_URL ||
+  'https://osm-stats-production-api.azurewebsites.net/users/';
 
 // APPLICATION SETTINGS
 export const DEFAULT_LOCALE = process.env.REACT_APP_DEFAULT_LOCALE || 'en';
+export const ENVIRONMENT= process.env.REACT_APP_ENVIRONMENT || '';
 export const PROJECTCARD_CONTRIBUTION_SHOWN_THRESHOLD =
   process.env.REACT_APP_PROJECTCARD_CONTRIBUTION_SHOWN_THRESHOLD || 5;
 export const INTERMEDIATE_LEVEL_COUNT =
@@ -16,7 +20,8 @@ export const INTERMEDIATE_LEVEL_COUNT =
 export const ADVANCED_LEVEL_COUNT = Number(process.env.REACT_APP_TM_MAPPER_LEVEL_ADVANCED) || 500;
 export const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || '';
 export const ENABLE_SERVICEWORKER = process.env.REACT_APP_ENABLE_SERVICEWORKER || 0;
-export const MAP_MAX_AREA = process.env.REACT_APP_MAP_MAX_AREA || 5000;
+export const MAX_AOI_AREA = Number(process.env.REACT_APP_MAX_AOI_AREA) || 5000;
+export const MAX_FILESIZE = parseInt(process.env.REACT_APP_MAX_FILESIZE) || 1000000; // bytes
 
 // ORGANISATIONAL INFORMATION
 export const ORG_NAME = process.env.REACT_APP_ORG_NAME || '';
@@ -33,10 +38,19 @@ export const ORG_INSTAGRAM = process.env.REACT_APP_ORG_INSTAGRAM || 'https://www
 export const ORG_YOUTUBE = process.env.REACT_APP_ORG_YOUTUBE || 'https://www.youtube.com';
 export const ORG_GITHUB = process.env.REACT_APP_ORG_GITHUB || 'https://github.com/';
 export const MATOMO_ID = process.env.REACT_APP_MATOMO_ID || '';
-export const IMAGE_UPLOAD_SERVICE = process.env.REACT_APP_IMAGE_UPLOAD_API_URL !== undefined;
+export const IMAGE_UPLOAD_SERVICE = process.env.REACT_APP_IMAGE_UPLOAD_API_URL || '';
 export const HOMEPAGE_VIDEO_URL = process.env.REACT_APP_HOMEPAGE_VIDEO_URL || '';
+// Sentry.io DSN
+export const SENTRY_FRONTEND_DSN = process.env.REACT_APP_SENTRY_FRONTEND_DSN;
 
-export const MAX_FILESIZE = parseInt(process.env.REACT_APP_MAX_FILESIZE) || 1000000; // bytes
+// OSM API and Editor URLs
+export const OSM_SERVER_URL =
+  process.env.REACT_APP_OSM_SERVER_URL || 'https://www.openstreetmap.org';
+export const ID_EDITOR_URL =
+  process.env.REACT_APP_ID_EDITOR_URL || 'https://www.openstreetmap.org/edit?editor=id&';
+export const POTLATCH2_EDITOR_URL =
+  process.env.REACT_APP_POTLATCH2_EDITOR_URL ||
+  'https://www.openstreetmap.org/edit?editor=potlatch2';
 
 export const TASK_COLOURS = {
   READY: '#fff',
@@ -47,6 +61,13 @@ export const TASK_COLOURS = {
   INVALIDATED: '#fceca4',
   BADIMAGERY: '#d8dae4',
   PRIORITY_AREAS: '#efd1d1',
+};
+
+export const CHART_COLOURS = {
+  red: '#d73f3f',
+  green: '#3e9c67',
+  blue: '#1757c4',
+  orange: '#f09733',
 };
 
 const fallbackRasterStyle = {
@@ -140,3 +161,9 @@ export const MAP_STYLE = MAPBOX_TOKEN
   : BASEMAP_OPTIONS[1].value;
 export const MAPBOX_RTL_PLUGIN_URL =
   'https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.0/mapbox-gl-rtl-text.js';
+
+export const DROPZONE_SETTINGS = {
+  accept: 'image/*',
+  multiple: false,
+  maxSize: 256000,
+};

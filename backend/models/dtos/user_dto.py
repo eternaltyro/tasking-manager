@@ -6,7 +6,6 @@ from schematics.types import (
     EmailType,
     LongType,
     BooleanType,
-    UTCDateTimeType,
 )
 from schematics.types.compound import ListType, ModelType, BaseType
 from backend.models.dtos.stats_dto import Pagination
@@ -47,18 +46,15 @@ def is_known_role(value):
 class UserDTO(Model):
     """ DTO for User """
 
-    validation_message = BooleanType(default=True)
     id = LongType()
     username = StringType()
     role = StringType()
     mapping_level = StringType(
         serialized_name="mappingLevel", validators=[is_known_mapping_level]
     )
-    date_registered = UTCDateTimeType(serialized_name="dateRegistered")
-    tasks_mapped = IntType(serialized_name="tasksMapped")
-    tasks_validated = IntType(serialized_name="tasksValidated")
-    tasks_invalidated = IntType(serialized_name="tasksInvalidated")
+    projects_mapped = IntType(serialized_name="projectsMapped")
     email_address = EmailType(serialized_name="emailAddress")
+
     is_email_verified = EmailType(
         serialized_name="isEmailVerified", serialize_when_none=False
     )
@@ -77,6 +73,8 @@ class UserDTO(Model):
     mentions_notifications = BooleanType(serialized_name="mentionsNotifications")
     comments_notifications = BooleanType(serialized_name="commentsNotifications")
     projects_notifications = BooleanType(serialized_name="projectsNotifications")
+    tasks_notifications = BooleanType(serialized_name="tasksNotifications")
+    teams_notifications = BooleanType(serialized_name="teamsNotifications")
 
     # these are read only
     missing_maps_profile = StringType(serialized_name="missingMapsProfile")

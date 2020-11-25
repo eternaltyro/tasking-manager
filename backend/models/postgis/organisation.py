@@ -36,6 +36,7 @@ class Organisation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(512), nullable=False, unique=True)
     logo = db.Column(db.String)  # URL of a logo
+    description = db.Column(db.String)
     url = db.Column(db.String)
 
     managers = db.relationship(
@@ -59,6 +60,7 @@ class Organisation(db.Model):
 
         new_org.name = new_organisation_dto.name
         new_org.logo = new_organisation_dto.logo
+        new_org.description = new_organisation_dto.description
         new_org.url = new_organisation_dto.url
 
         for manager in new_organisation_dto.managers:
@@ -121,7 +123,7 @@ class Organisation(db.Model):
 
     @staticmethod
     def get_organisation_by_name(organisation_name: str):
-        """ Get organisation by name
+        """Get organisation by name
         :param organisation_name: name of organisation
         :return: Organisation if found else None
         """
@@ -129,7 +131,7 @@ class Organisation(db.Model):
 
     @staticmethod
     def get_organisation_name_by_id(organisation_id: int):
-        """ Get organisation name by id
+        """Get organisation name by id
         :param organisation_id:
         :return: Organisation name
         """
@@ -154,14 +156,19 @@ class Organisation(db.Model):
         )
         return query_results
 
-    def as_dto(self):
+    def as_dto(self, omit_managers=False):
         """ Returns a dto for an organisation """
         organisation_dto = OrganisationDTO()
         organisation_dto.organisation_id = self.id
         organisation_dto.name = self.name
         organisation_dto.logo = self.logo
+        organisation_dto.description = self.description
         organisation_dto.url = self.url
         organisation_dto.managers = []
+
+        if omit_managers:
+            return organisation_dto
+
         for manager in self.managers:
             org_manager_dto = OrganisationManagerDTO()
             org_manager_dto.username = manager.username

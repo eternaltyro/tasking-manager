@@ -300,12 +300,24 @@ const LearnToValidate = ({ section }) => {
     },
   ];
 
+  const videos = [
+    {
+      message: 'learnValidateHowToVideo',
+      youTubeId: 'frVwlJn4tdI',
+    },
+    {
+      message: 'learnValidateTrainingVideo',
+      youTubeId: 'YQ18XfRM6d4',
+    },
+  ];
+
   return (
     <div className="w-100">
       <LearnStruct section={section} messagesObjs={messagesObjs} items={items} />
       <p className="w-60 lh-copy f5 left mb5">
         {<FormattedMessage {...messages.learnValidateNote} />}
       </p>
+      <Videos contents={videos} />
     </div>
   );
 };
@@ -347,7 +359,7 @@ const LearnToMap = ({ section }) => {
     },
     {
       message: 'learnMapBuildings',
-      youTubeId: 'lSLe6rjtgi0',
+      youTubeId: 'nswUcgMfKTM',
     },
     {
       message: 'learnMapRoads',

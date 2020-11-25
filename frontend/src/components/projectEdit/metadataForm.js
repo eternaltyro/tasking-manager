@@ -1,11 +1,14 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { FormattedMessage } from 'react-intl';
 import { useSelector } from 'react-redux';
+import Select from 'react-select';
+import { FormattedMessage } from 'react-intl';
+
 import messages from './messages';
-import { StateContext, styleClasses, handleCheckButton } from '../../views/projectEdit';
+import typesMessages from '../messages';
+import { StateContext, styleClasses } from '../../views/projectEdit';
+import { CheckBox } from '../formInputs';
 import { ProjectInterests } from './projectInterests';
 import { fetchLocalJSONAPI } from '../../network/genericJSONRequest';
-import Select from 'react-select';
 import { ID_PRESETS } from '../../config/presets';
 
 export const MetadataForm = () => {
@@ -18,8 +21,8 @@ export const MetadataForm = () => {
 
   useEffect(() => {
     if (userDetails && userDetails.id) {
-      const query = userDetails.role === 'ADMIN' ? '' : `?manager_user_id=${userDetails.id}`;
-      fetchLocalJSONAPI(`organisations/${query}`, token)
+      const query = userDetails.role === 'ADMIN' ? '' : `&manager_user_id=${userDetails.id}`;
+      fetchLocalJSONAPI(`organisations/?omitManagerList=true${query}`, token)
         .then((result) => setOrganisations(result.organisations))
         .catch((e) => console.log(e));
     }
@@ -30,19 +33,16 @@ export const MetadataForm = () => {
   }, [userDetails, token]);
 
   const elements = [
-    { item: 'ROADS', showItem: 'Roads' },
-    { item: 'BUILDINGS', showItem: 'Buildings' },
-    { item: 'WATERWAYS', showItem: 'Waterways' },
-    { item: 'LAND_USE', showItem: 'Landuse' },
-    { item: 'OTHER', showItem: 'Other' },
+    { item: 'ROADS', messageId: 'roads' },
+    { item: 'BUILDINGS', messageId: 'buildings' },
+    { item: 'WATERWAYS', messageId: 'waterways' },
+    { item: 'LAND_USE', messageId: 'landUse' },
+    { item: 'OTHER', messageId: 'other' },
   ];
 
   const mapperLevels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 
-  const handleMappingTypes = (event) => {
-    let types = projectInfo.mappingTypes;
-
-    types = handleCheckButton(event, types);
+  const handleMappingTypes = (types) => {
     setProjectInfo({ ...projectInfo, mappingTypes: types });
   };
 
@@ -104,17 +104,18 @@ export const MetadataForm = () => {
             <FormattedMessage {...messages.mappingTypes} />*
           </label>
           {elements.map((elm) => (
-            <label className="db pv2">
-              <input
-                className="mr2 h"
-                name="mapping_types"
-                checked={projectInfo.mappingTypes.includes(elm.item)}
-                onChange={handleMappingTypes}
-                type="checkbox"
-                value={elm.item}
-              />
-              {elm.showItem}
-            </label>
+            <div className="pv3 pr3" aria-label="mapping_types" key={elm.messageId}>
+              <div className="ph0 pt1 fl" aria-labelledby={elm.messageId}>
+                <CheckBox
+                  activeItems={projectInfo.mappingTypes}
+                  toggleFn={handleMappingTypes}
+                  itemId={elm.item}
+                />
+              </div>
+              <span className="fl pt2 mr1 ph2" id={elm.messageId}>
+                <FormattedMessage {...typesMessages[elm.messageId]} />
+              </span>
+            </div>
           ))}
         </div>
         <div className="w-50 fl">

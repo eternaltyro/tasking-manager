@@ -5,9 +5,12 @@ import { FormattedMessage } from 'react-intl';
 import messages from '../user/messages';
 import { TwitterIconNoBg, FacebookIcon, LinkedinIcon, ProfilePictureIcon } from '../svgIcons';
 import { MappingLevelMessage } from '../mappingLevel';
-import { NextMappingLevel } from '../user/settings';
+import { NextMappingLevel } from '../user/topBar';
+import { UserOrganisations } from './userTeamsOrgs';
 import { SectionMenu } from '../menu';
 import OsmLogo from '../../assets/img/osm_logo.png';
+import MissingMapsLogo from '../../assets/img/organizations/missingmaps.png';
+import { OSM_SERVER_URL } from '../../config';
 
 const SocialMedia = ({ data }) => {
   const socialMediaItems = ['twitterId', 'facebookId', 'linkedinId'];
@@ -31,38 +34,38 @@ const SocialMedia = ({ data }) => {
   };
 
   const createLink = (field, value) => {
-    const aClass = 'blue-grey no-underline';
-    let url = null;
-    switch (field) {
-      case 'twitterId':
-        url = 'https://www.twitter.com/' + value;
-        break;
-      case 'facebookId':
-        url = 'https://www.facebook.com/' + value;
-        break;
-      case 'linkedinId':
-        url = 'https://www.linkedin.com/' + value;
-        break;
-      case 'osm':
-        url = 'https://openstreetmap.org/user/' + value;
-        break;
-      default:
-        return null;
-    }
+    const urls = {
+      twitterId: `https://www.twitter.com/${value}`,
+      facebookId: `https://www.facebook.com/${value}`,
+      linkedinId: `https://www.linkedin.com/in/${value}`,
+      osm: `${OSM_SERVER_URL}/user/${value}`,
+      missingmaps: `https://www.missingmaps.org/users/#/${value}`,
+    };
 
     return (
-      <a className={aClass} rel="noopener noreferrer" target="_blank" href={url}>
+      <a
+        className="blue-grey no-underline"
+        rel="noopener noreferrer"
+        target="_blank"
+        href={urls[field]}
+      >
         {value}
       </a>
     );
   };
 
   return (
-    <ul className="list pa0">
+    <ul className="list pa0 ma0 mt3">
       <li className="dib mr4-ns mr2 cf f7">
         <div className="mr2 h2">
           <img className="h1 v-mid" src={OsmLogo} alt="OpenStreetMap" />{' '}
           {createLink('osm', data.username)}
+        </div>
+      </li>
+      <li className="dib mr4-ns mr2 cf f7">
+        <div className="mr2 h2">
+          <img className="h1 v-mid" src={MissingMapsLogo} alt="Missing Maps" />{' '}
+          {createLink('missingmaps', data.username)}
         </div>
       </li>
       {socialMediaItems.map((i) => {
@@ -94,7 +97,7 @@ const MyContributionsNav = ({ username, authUser }) => {
   ];
 
   return (
-    <div className="fl ph6-l ph4-m ph2">
+    <div className="fl ph5-l ph2">
       <SectionMenu items={items} />
     </div>
   );
@@ -118,8 +121,8 @@ export const HeaderProfile = ({ userDetails, changesets, selfProfile }) => {
 
   return (
     <>
-      <div className="w-100 h-100 cf pv3 ph6-l ph4-m ph2 bg-white blue-dark">
-        <div className="fl dib mr3">
+      <div className="w-100 h-100 cf pv3 pl5-l ph2 bg-white blue-dark">
+        <div className="fl dib pr3">
           {user.pictureUrl ? (
             <img
               className="h4 w4 br-100 pa1 ba b--grey-light bw3 red"
@@ -130,15 +133,18 @@ export const HeaderProfile = ({ userDetails, changesets, selfProfile }) => {
             <ProfilePictureIcon className="red" />
           )}
         </div>
-        <div className="pl2 dib">
-          <div className="mb4">
+        <div className="w-70-ns w-100 fl dib">
+          <div className="pl2 dib w-50-l fl w-100">
             <p className="barlow-condensed f2 ttu b ma0 mb2">{user.name || user.username}</p>
             <p className="f4 ma0 mb2">
               <MappingLevelMessage level={user.mappingLevel} />
             </p>
             <NextMappingLevel changesetsCount={changesets} />
+            <SocialMedia data={user} />
           </div>
-          <SocialMedia data={user} />
+          <div className="pt1 dib fl w-50-l w-100 v-btm">
+            <UserOrganisations userId={user.id} />
+          </div>
         </div>
       </div>
       {user.username === authDetails.username && <MyContributionsNav username={user.username} />}

@@ -19,7 +19,7 @@ import {
 import { getEditors } from '../../utils/editorsList';
 import { htmlFromMarkdown } from '../../utils/htmlFromMarkdown';
 import { pushToLocalJSONAPI, fetchLocalJSONAPI } from '../../network/genericJSONRequest';
-import { UserFetchTextarea } from '../projectDetail/questionsAndComments';
+import { CommentInputField } from '../comments/commentInput';
 import { useFetchLockedTasks, useClearLockedTasks } from '../../hooks/UseLockedTasks';
 
 export function CompletionTabForMapping({
@@ -167,10 +167,10 @@ export function CompletionTabForMapping({
           <FormattedMessage {...messages.comment} />
         </h4>
         <p>
-          <UserFetchTextarea
-            value={taskComment}
-            setValueFn={(e) => setTaskComment(e.target.value)}
-            token={token}
+          <CommentInputField
+            comment={taskComment}
+            setComment={setTaskComment}
+            enableHashtagPaste={true}
           />
         </p>
       </div>
@@ -265,7 +265,6 @@ export function CompletionTabForValidation({
           {(close) => <UnsavedMapChangesModalContent close={close} action={showMapChangesModal} />}
         </Popup>
       )}
-      <div className="bb b--grey-light w-100"></div>
       <div className="cf">
         {taskInstructions && (
           <TaskSpecificInstructions instructions={taskInstructions} open={false} />
@@ -306,10 +305,10 @@ export function CompletionTabForValidation({
           <FormattedMessage {...messages.comment} />
         </h4>
         <p>
-          <UserFetchTextarea
-            value={taskComment}
-            setValueFn={(e) => setTaskComment(e.target.value)}
-            token={token}
+          <CommentInputField
+            comment={taskComment}
+            setComment={setTaskComment}
+            enableHashtagPaste={true}
           />
         </p>
       </div>
@@ -391,7 +390,8 @@ export function ReopenEditor({ project, action, editor, callEditor }: Object) {
   );
 }
 
-export function SidebarToggle({ setShowSidebar, editorRef }: Object) {
+export function SidebarToggle({ setShowSidebar }: Object) {
+  const iDContext = useSelector((state) => state.editor.context);
   return (
     <div>
       <FormattedMessage {...messages.hideSidebar}>
@@ -400,7 +400,7 @@ export function SidebarToggle({ setShowSidebar, editorRef }: Object) {
             <SidebarIcon
               onClick={() => {
                 setShowSidebar(false);
-                editorRef.ui().restart();
+                iDContext.ui().restart();
               }}
             />
           </div>
@@ -433,8 +433,8 @@ function UnsavedMapChangesModalContent({ close, action }: Object) {
 function TaskSpecificInstructions({ instructions, open = true }: Object) {
   const [isOpen, setIsOpen] = useState(open);
   return (
-    <div className="">
-      <h4 className="ttu blue-grey mb0 pointer" onClick={() => setIsOpen(!isOpen)}>
+    <>
+      <h4 className="ttu blue-grey mt1 mb0 pointer" onClick={() => setIsOpen(!isOpen)}>
         {isOpen ? (
           <ChevronDownIcon style={{ height: '14px' }} className="pr1 pb1 v-mid" />
         ) : (
@@ -448,6 +448,6 @@ function TaskSpecificInstructions({ instructions, open = true }: Object) {
           dangerouslySetInnerHTML={htmlFromMarkdown(instructions)}
         />
       )}
-    </div>
+    </>
   );
 }

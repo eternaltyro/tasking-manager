@@ -3,6 +3,7 @@ import { Router, Redirect, globalHistory } from '@reach/router';
 import { QueryParamProvider } from 'use-query-params';
 import { useMeta } from 'react-meta-elements';
 import { connect } from 'react-redux';
+import * as Sentry from '@sentry/react';
 
 import './assets/styles/index.scss';
 import { ORG_NAME, MATOMO_ID } from './config';
@@ -10,6 +11,7 @@ import { Header } from './components/header';
 import { Footer } from './components/footer';
 import { Preloader } from './components/preloader';
 import { Home } from './views/home';
+import { FallbackComponent } from './views/fallback';
 import { AboutPage } from './views/about';
 import { LearnPage } from './views/learn';
 import { QuickstartPage } from './views/quickstart';
@@ -39,6 +41,7 @@ import { SelectTask } from './views/taskSelection';
 import { MapTask, ValidateTask } from './views/taskAction';
 import { EmailVerification } from './views/verifyEmail';
 import { ProjectEdit } from './views/projectEdit';
+import { ProjectStats } from './views/projectStats';
 import { ContactPage } from './views/contact';
 import { SwaggerView } from './views/swagger';
 import { ContributionsPage, ContributionsPageIndex, UserStats } from './views/contributions';
@@ -57,7 +60,7 @@ let App = (props) => {
   const { isLoading } = props;
 
   return (
-    <>
+    <Sentry.ErrorBoundary fallback={<FallbackComponent />}>
       {isLoading ? (
         <Preloader />
       ) : (
@@ -73,15 +76,26 @@ let App = (props) => {
                   <ProjectsPageIndex path="/" />
                   <MoreFilters path="/filters/*" />
                 </ProjectsPage>
+                <ProjectDetailPage path="projects/:id" />
+                <SelectTask path="projects/:id/tasks" />
+                <ProjectStats path="projects/:id/stats" />
+                <MapTask path="projects/:id/map" />
+                <ValidateTask path="projects/:id/validate" />
                 <LearnPage path="learn" />
                 <QuickstartPage path="learn/quickstart" />
+                <AboutPage path="about" />
+                <ContactPage path="contact/" />
                 <ContributionsPageIndex path="contributions">
                   <UserStats path="/" />
                   <ContributionsPage path="tasks/*" />
                   <UserProjectsPage path="projects/*" />
                   <MyTeams path="teams/*" />
                 </ContributionsPageIndex>
-                <AboutPage path="about" />
+                <UserDetail path="users/:username" />
+                <NotificationsPage path="inbox">
+                  <NotificationPageIndex path="/" />
+                  <NotificationDetail path="message/:id" />
+                </NotificationsPage>
                 <Authorized path="authorized" />
                 <Login path="login" />
                 <Welcome path="welcome" />
@@ -110,16 +124,6 @@ let App = (props) => {
                   <EditLicense path="licenses/:id" />
                 </ManagementSection>
                 <TeamDetail path="teams/:id/membership" />
-                <SelectTask path="projects/:id/tasks" />
-                <MapTask path="projects/:id/map" />
-                <UserDetail path="users/:username" />
-                <ValidateTask path="projects/:id/validate" />
-                <NotificationsPage path="inbox">
-                  <NotificationPageIndex path="/" />
-                  <NotificationDetail path="message/:id" />
-                </NotificationsPage>
-                <ProjectDetailPage path="projects/:id" />
-                <ContactPage path="contact/" />
                 <SwaggerView path="/api-docs/" />
                 <Redirect from="project/:id" to="/projects/:id" noThrow />
                 <Redirect from="contribute/" to="/explore" noThrow />
@@ -133,7 +137,7 @@ let App = (props) => {
           </Router>
         </div>
       )}
-    </>
+    </Sentry.ErrorBoundary>
   );
 };
 

@@ -4,13 +4,13 @@ import { Redirect } from '@reach/router';
 import ReactPlaceholder from 'react-placeholder';
 import 'react-placeholder/lib/reactPlaceholder.css';
 
-import { UserTopBar } from '../components/user/settings';
+import { UserTopBar } from '../components/user/topBar';
 import { HelpCard, FirstProjectBanner } from '../components/user/content';
 import { calculateCompleteness } from '../components/user/completeness';
-import { UserInformationForm } from '../components/user/forms';
+import { PersonalInformationForm } from '../components/user/forms/personalInformation';
 import { WelcomeCard } from '../components/user/content';
-import { ProjectCard } from '../components/projectcard/projectCard';
-import { nCardPlaceholders } from '../components/projectcard/nCardPlaceholder';
+import { ProjectCard } from '../components/projectCard/projectCard';
+import { nCardPlaceholders } from '../components/projectCard/nCardPlaceholder';
 import { useFetch } from '../hooks/UseFetch';
 import { useSetTitleTag } from '../hooks/UseMetaTags';
 
@@ -24,7 +24,7 @@ function IncompleteProfile() {
           <HelpCard />
         </div>
         <div className="fl w-100 w-40-l pb3 pl3-l">
-          <UserInformationForm />
+          <PersonalInformationForm />
         </div>
       </div>
     </>
@@ -77,8 +77,8 @@ export function Welcome() {
       <div className="pull-center">
         {completeness <= 0.5 ? (
           <IncompleteProfile />
-        ) : userDetails.tasksMapped ? (
-          <Redirect to={'/contributions/projects'} noThrow />
+        ) : userDetails.projectsMapped ? (
+          <Redirect to={'/contributions/projects/?mappedByMe=1'} noThrow />
         ) : (
           <NewContributor username={userDetails.username} userIsloggedIn={userIsloggedIn} />
         )}

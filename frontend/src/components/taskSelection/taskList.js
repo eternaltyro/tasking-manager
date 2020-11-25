@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSelector } from 'react-redux';
 import { useLocation } from '@reach/router';
 import Popup from 'reactjs-popup';
 import { useQueryParam, NumberParam, StringParam } from 'use-query-params';
@@ -16,27 +15,25 @@ import { TASK_COLOURS } from '../../config';
 import { LockIcon, ListIcon, ZoomPlusIcon, CloseIcon, InternalLinkIcon } from '../svgIcons';
 import { PaginatorLine, howManyPages } from '../paginator';
 import { Dropdown } from '../dropdown';
-import { Button } from '../button';
+import { CustomButton } from '../button';
 
 export function TaskStatus({ status, lockHolder }: Object) {
-  const dotSize = ['READY', 'LOCKED_FOR_MAPPING'].includes(status) ? '0.875rem' : '1rem';
+  const isReadyOrLockedForMapping = ['READY', 'LOCKED_FOR_MAPPING'].includes(status);
+  const dotSize = isReadyOrLockedForMapping ? '0.875rem' : '1rem';
+  const isLockedStatus = ['LOCKED_FOR_VALIDATION', 'LOCKED_FOR_MAPPING'].includes(status);
   return (
-    <span>
+    <>
       <span
-        className={`${
-          ['READY', 'LOCKED_FOR_MAPPING'].includes(status) && 'ba bw1 b--grey-light'
-        } dib v-mid`}
+        className={`${isReadyOrLockedForMapping ? 'ba bw1 b--grey-light' : ''} dib v-mid`}
         style={{
           height: dotSize,
           width: dotSize,
           backgroundColor: TASK_COLOURS[status],
         }}
       ></span>
-      {status.startsWith('LOCKED_FOR_') && (
-        <LockIcon style={{ paddingTop: '1px' }} className="v-mid pl1 h1 w1" />
-      )}
+      {isLockedStatus && <LockIcon style={{ paddingTop: '1px' }} className="v-mid pl1 h1 w1" />}
       <span className="pl2 v-mid">
-        {status.startsWith('LOCKED_FOR_') && lockHolder ? (
+        {isLockedStatus && lockHolder ? (
           <FormattedMessage
             {...messages.lockedBy}
             values={{
@@ -48,7 +45,7 @@ export function TaskStatus({ status, lockHolder }: Object) {
           <FormattedMessage {...messages[`taskStatus_${status}`]} />
         )}
       </span>
-    </span>
+    </>
   );
 }
 
@@ -139,37 +136,47 @@ function TaskItem({
 }
 
 export function TaskFilter({ userCanValidate, statusFilter, setStatusFn }: Object) {
-  const user = useSelector((state) => state.auth.get('userDetails'));
   const activeClass = 'bg-blue-grey white';
   const inactiveClass = 'bg-white blue-grey';
 
-  if (user.isExpert || user.mappingLevel !== 'BEGINNER') {
-    return (
-      <div className="pt1">
-        <Button
-          onClick={() => setStatusFn('all')}
-          className={`dbi ${!statusFilter || statusFilter === 'all' ? activeClass : inactiveClass}`}
-        >
-          <FormattedMessage {...messages.filterAll} />
-        </Button>
-        <Button
-          onClick={() => setStatusFn('readyToMap')}
-          className={`dbi ${statusFilter === 'readyToMap' ? activeClass : inactiveClass}`}
-        >
-          <FormattedMessage {...messages.filterReadyToMap} />
-        </Button>
-        {userCanValidate && (
-          <Button
+  return (
+    <div className="pv1">
+      <CustomButton
+        onClick={() => setStatusFn('all')}
+        className={`dbi bn ph3 pv2 ${
+          !statusFilter || statusFilter === 'all' ? activeClass : inactiveClass
+        }`}
+      >
+        <FormattedMessage {...messages.filterAll} />
+      </CustomButton>
+      <CustomButton
+        onClick={() => setStatusFn('readyToMap')}
+        className={`dbi bn ph3 pv2 ${statusFilter === 'readyToMap' ? activeClass : inactiveClass}`}
+      >
+        <FormattedMessage {...messages.filterReadyToMap} />
+      </CustomButton>
+      {userCanValidate && (
+        <>
+          <CustomButton
             onClick={() => setStatusFn('readyToValidate')}
-            className={`dbi ${statusFilter === 'readyToValidate' ? activeClass : inactiveClass}`}
+            className={`dbi bn ph3 pv2 ${
+              statusFilter === 'readyToValidate' ? activeClass : inactiveClass
+            }`}
           >
             <FormattedMessage {...messages.filterReadyToValidate} />
-          </Button>
-        )}
-      </div>
-    );
-  }
-  return <></>;
+          </CustomButton>
+          <CustomButton
+            onClick={() => setStatusFn('unavailable')}
+            className={`dbi bn ph3 pv2 ${
+              statusFilter === 'unavailable' ? activeClass : inactiveClass
+            }`}
+          >
+            <FormattedMessage {...messages.taskStatus_BADIMAGERY} />
+          </CustomButton>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function TaskList({
@@ -185,7 +192,6 @@ export function TaskList({
   textSearch,
   setTextSearch,
 }: Object) {
-  const user = useSelector((state) => state.auth.get('userDetails'));
   const [readyTasks, setTasks] = useState([]);
   const [activeTaskModal, setActiveTaskModal] = useState(null);
   const [sortBy, setSortingOption] = useQueryParam('sortBy', StringParam);
@@ -203,6 +209,9 @@ export function TaskList({
         newTasks = newTasks.filter((task) =>
           ['MAPPED', 'BADIMAGERY'].includes(task.properties.taskStatus),
         );
+      }
+      if (statusFilter === 'unavailable') {
+        newTasks = newTasks.filter((task) => task.properties.taskStatus === 'BADIMAGERY');
       }
       if (textSearch) {
         if (Number(textSearch)) {
@@ -242,50 +251,46 @@ export function TaskList({
   return (
     <div className="cf">
       <div className="cf">
-        {user.isExpert && (
-          <div>
-            <div className="w-50-l w-100 dib v-mid pr2 pv1 relative">
-              <FormattedMessage {...messages.filterPlaceholder}>
-                {(msg) => {
-                  return (
-                    <input
-                      type="text"
-                      placeholder={msg}
-                      className="pa2 w-100"
-                      value={textSearch || ''}
-                      onChange={(e) => setTextSearch(e.target.value)}
-                    />
-                  );
-                }}
-              </FormattedMessage>
-              <CloseIcon
-                onClick={() => {
-                  setTextSearch('');
-                }}
-                className={`absolute w1 h1 top-0 red pt3 pointer pr3 right-0 ${
-                  textSearch ? 'dib' : 'dn'
-                }`}
-              />
-            </div>
-            <div className="w-50-l w-100 dib pv1">
-              <Dropdown
-                onAdd={() => {}}
-                onRemove={() => {}}
-                onChange={updateSortingOption}
-                value={sortBy || 'date'}
-                options={sortingOptions}
-                display={sortBy || <FormattedMessage {...messages.sortById} />}
-                className="blue-dark bg-white mr1 v-mid pv2 ph2 ba b--grey-light"
-              />
-            </div>
-          </div>
-        )}
-        <TaskFilter
-          userCanValidate={userCanValidate}
-          statusFilter={statusFilter}
-          setStatusFn={setStatusFilter}
-        />
+        <div className="w-40-l w-50-m w-100 dib v-mid pr2 pv1 relative">
+          <FormattedMessage {...messages.filterPlaceholder}>
+            {(msg) => {
+              return (
+                <input
+                  type="text"
+                  placeholder={msg}
+                  className="pa2 w-100"
+                  value={textSearch || ''}
+                  onChange={(e) => setTextSearch(e.target.value)}
+                />
+              );
+            }}
+          </FormattedMessage>
+          <CloseIcon
+            onClick={() => {
+              setTextSearch('');
+            }}
+            className={`absolute w1 h1 top-0 red pt3 pointer pr3 right-0 ${
+              textSearch ? 'dib' : 'dn'
+            }`}
+          />
+        </div>
+        <div className="w-60-l w-50-m w-100 dib pv1">
+          <Dropdown
+            onAdd={() => {}}
+            onRemove={() => {}}
+            onChange={updateSortingOption}
+            value={sortBy || 'date'}
+            options={sortingOptions}
+            display={sortBy || <FormattedMessage {...messages.sortById} />}
+            className="blue-dark bg-white mr1 v-mid pv2 ph2 ba b--grey-light"
+          />
+        </div>
       </div>
+      <TaskFilter
+        userCanValidate={userCanValidate}
+        statusFilter={statusFilter}
+        setStatusFn={setStatusFilter}
+      />
       <ReactPlaceholder
         showLoadingAnimation={true}
         rows={6}
@@ -352,11 +357,11 @@ function TaskActivityModal({
             <div className="w-100 pa4 blue-dark bg-white">
               <CloseIcon className="h1 w1 fr pointer" onClick={() => close()} />
               <h3 className="ttu f3 pa0 ma0 barlow-condensed b mb4">
-                <FormattedMessage {...messages.taskSplitted} />
+                <FormattedMessage {...messages.taskUnavailable} />
               </h3>
               <p className="pb0">
                 <FormattedMessage
-                  {...messages.taskSplittedDescription}
+                  {...messages.taskSplitDescription}
                   values={{ id: <b>#{taskId}</b> }}
                 />
               </p>
@@ -389,7 +394,7 @@ function PaginatedList({
   useEffect(() => {
     latestItems.current = items;
   });
-  // the useEffect above avoids the next one to run everytime the items change
+  // the useEffect above avoids the next one to run every time the items change
   useEffect(() => {
     // switch the taskList page to always show the selected task.
     // Only do it if there is only one task selected

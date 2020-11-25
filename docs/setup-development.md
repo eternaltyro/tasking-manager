@@ -14,10 +14,12 @@ The two parts can be developed independently of each other.
 
 The client is the front-end user interface of the Tasking Manager. It is based on the React framework and you can find all files in the `frontend` directory.
 
+If you don't want to setup a backend server, you can work on frontend development using our staging server API. Execute `export TM_APP_API_URL='https://tasking-manager-staging-api.hotosm.org'` before running the `yarn start` command. Be aware that the staging API can be offline while we are deploying newer versions to the staging server and that you'll not have access to some management views due to permissions. Check the [configuration](#configuration) section to learn more about how to configure Tasking Manager.
+
 **Dependencies**
 
 The following dependencies must be available _globally_ on your system:
-* Download and install [NodeJS LTS v10+](https://nodejs.org/en/) and [yarn](https://classic.yarnpkg.com/en/docs/install)
+* Download and install [NodeJS LTS v12+](https://nodejs.org/en/) and [yarn](https://classic.yarnpkg.com/en/docs/install)
 * Go into the `frontend` directory and execute `yarn`.
 
 #### Available Scripts
@@ -59,8 +61,8 @@ The backend is made up of a postgres database and an associated API that calls v
 
 #### Dependencies
 
-* [Python 3.6+](https://www.python.org/downloads/)
-  * Note: The project does not work with Python 2.x. You **will** need Python 3.6+
+* [Python 3.7+](https://www.python.org/downloads/)
+  * Python 3.7 is what HOT uses in production. You can use Python 3.8 too.
 * [PostgreSQL](https://www.postgresql.org/download/) with [PostGIS](https://postgis.net/install/)
 * [pip](https://pip.pypa.io/en/stable/installing/)
 * [libgeos-dev](https://trac.osgeo.org/geos/)
@@ -68,6 +70,8 @@ The backend is made up of a postgres database and an associated API that calls v
 You can check the [Dockerfile](../scripts/docker/tasking-manager/Dockerfile) to have a reference of how to install it in a Debian/Ubuntu system.
 
 #### Configuration
+
+There are two ways to configure Tasking Manager. You can set some environment variables on your shell or you can define the configuration in the `tasking-manager.env` file on the repository root directory. To use that last option, follow the below instructions:
 
 * Copy the example configuration file to start your own configuration: `cp example.env tasking-manager.env`.
 * Adjust the `tasking-manager.env` configuration file to fit your configuration.
@@ -120,9 +124,9 @@ python3 manage.py db upgrade
 
 You can use [this script](../scripts/database/migration-from-tm2-postgres.sql) to migrate your data from the prior tasking manager version (v2) to the current one. Please see [this documentation page](../scripts/database/README.md) for important information about this process.
 
-#### Set permissions to create a task
+#### Set permissions to create projects
 
-To be able to create a task and have full permissions as an admin inside TM, login to the TM with your OSM account to populate your user information in the database, then execute the following command on your terminal (with the OS user that is the owner of the database):
+To be able to create projects and have full permissions as an admin user inside TM, login to the TM with your OSM account to populate your user information in the database, then execute the following command on your terminal (with the OS user that is the owner of the database):
 
 `psql -d <your_database> -c "UPDATE users set role = 1 where username = '<your_osm_username>'"`
 

@@ -4,6 +4,18 @@ import { defineMessages } from 'react-intl';
  * Internationalized messages for use on views.
  */
 export default defineMessages({
+  errorFallback: {
+    id: 'error.page.title',
+    defaultMessage: 'An error occurred',
+  },
+  errorFallbackMessage: {
+    id: 'error.page.description',
+    defaultMessage: 'Something did not work well...',
+  },
+  return: {
+    id: 'error.page.link',
+    defaultMessage: 'Return',
+  },
   pageNotFound: {
     id: 'notFound.page.title',
     defaultMessage: 'Page not found',
@@ -15,6 +27,10 @@ export default defineMessages({
   notFoundLead: {
     id: 'notFound.lead',
     defaultMessage: 'Check the URL or report this error.',
+  },
+  projectTimeline: {
+    id: 'project.stats.timeline',
+    defaultMessage: 'Project timeline',
   },
   sectionNotAllowed: {
     id: 'management.forbiddenAccess.title',
@@ -83,7 +99,7 @@ export default defineMessages({
   editOrgNotAllowed: {
     id: 'teamsAndOrgs.management.organisation.manage.error',
     defaultMessage:
-      'You are not a manager of this organisation, so you are not allowed to edit it.',
+      'You are not a manager of this organization, so you are not allowed to edit it.',
   },
   manageOrganisation: {
     id: 'teamsAndOrgs.management.organisation.manage',
@@ -179,9 +195,8 @@ export default defineMessages({
   aboutIntro: {
     id: 'pages.about.intro',
     defaultMessage:
-      'Every day, a global community works tirelessly behind the scenes to literally put people on the map. They contribute to the online Open Data map of the world. Universal access to geospatial information is heavily changing how people use maps and what they build with them.',
+      'Every day, a global community works tirelessly behind the scenes to make the more complete map of the world. The resulting work is Open Data and can be used by anyone. Universal access to geospatial information is heavily changing how people use maps and what they build with them.',
   },
-
   learn: {
     id: 'pages.learn.title',
     defaultMessage: 'Learn',
@@ -295,6 +310,23 @@ export default defineMessages({
   learnMapBuildingsDescription: {
     id: 'pages.learn.videos.map_buildings.description',
     defaultMessage: 'Learn how to map buildings on OpenStreetMap.',
+  },
+  learnValidateHowToVideoTitle: {
+    id: 'pages.learn.validate.video.title',
+    defaultMessage: 'How to validate',
+  },
+  learnValidateHowToVideoDescription: {
+    id: 'pages.learn.validate.video.description',
+    defaultMessage: 'Learn how to start validating projects on Tasking Manager.',
+  },
+  learnValidateTrainingVideoTitle: {
+    id: 'pages.learn.validate.training.video.title',
+    defaultMessage: 'Validation training',
+  },
+  learnValidateTrainingVideoDescription: {
+    id: 'pages.learn.validate.training.video.description',
+    defaultMessage:
+      'Deep dive on validation with this training, which includes advanced concepts and the JOSM editor.',
   },
   learnValidateTitle: {
     id: 'pages.learn.validate_title',
@@ -510,9 +542,21 @@ export default defineMessages({
     id: 'pages.edit_project.buttons.save',
     defaultMessage: 'Save',
   },
-  goToProjectPage: {
-    id: 'pages.edit_project.buttons.go_to_project',
-    defaultMessage: 'Go to project page',
+  accessProject: {
+    id: 'pages.edit_project.buttons.access_project',
+    defaultMessage: 'Access project',
+  },
+  projectPage: {
+    id: 'pages.edit_project.buttons.project_page',
+    defaultMessage: 'Project page',
+  },
+  tasksPage: {
+    id: 'pages.edit_project.buttons.task_selection_page',
+    defaultMessage: 'Task selection page',
+  },
+  projectStats: {
+    id: 'pages.edit_project.buttons.project_stats',
+    defaultMessage: 'Project statistics',
   },
   updateSuccess: {
     id: 'pages.edit_project.actions.update.success',
@@ -568,5 +612,9 @@ export default defineMessages({
   projectEditSection_custom_editor: {
     id: 'pages.edit_project.sections.custom_editor',
     defaultMessage: 'Custom Editor',
+  },
+  duplicateCampaign: {
+    id: 'pages.create_campaign.duplicate',
+    defaultMessage: 'A campaign with the same name already exists',
   },
 });

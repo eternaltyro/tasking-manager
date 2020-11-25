@@ -35,7 +35,6 @@ from backend.models.postgis.utils import (
 )
 from backend.models.postgis.interests import project_interests
 from backend.services.users.user_service import UserService
-from backend.services.organisation_service import OrganisationService
 
 
 search_cache = TTLCache(maxsize=128, ttl=300)
@@ -50,7 +49,7 @@ class ProjectSearchServiceError(Exception):
 
     def __init__(self, message):
         if current_app:
-            current_app.logger.error(message)
+            current_app.logger.debug(message)
 
 
 class BBoxTooBigError(Exception):
@@ -58,7 +57,7 @@ class BBoxTooBigError(Exception):
 
     def __init__(self, message):
         if current_app:
-            current_app.logger.error(message)
+            current_app.logger.debug(message)
 
 
 class ProjectSearchService:
@@ -83,6 +82,7 @@ class ProjectSearchService:
                 Organisation.name.label("organisation_name"),
                 Organisation.logo.label("organisation_logo"),
             )
+            .filter(Project.geometry is not None)
             .outerjoin(Organisation, Organisation.id == Project.organisation_id)
             .group_by(Organisation.id, Project.id)
         )
@@ -91,9 +91,15 @@ class ProjectSearchService:
         if user is None:
             query = query.filter(Project.private.is_(False))
 
-        # Get also private projects of teams that the user is member.
         if user is not None and user.role != UserRole.ADMIN.value:
+            # Get also private projects of teams that the user is member.
             project_ids = [[p.project_id for p in t.team.projects] for t in user.teams]
+
+            # Get projects that belong to user organizations.
+            orgs_projects_ids = [[p.id for p in u.projects] for u in user.organisations]
+
+            project_ids.extend(orgs_projects_ids)
+
             project_ids = tuple(
                 set([item for sublist in project_ids for item in sublist])
             )
@@ -170,6 +176,19 @@ class ProjectSearchService:
         if paginated_results.total == 0:
             raise NotFound()
 
+        dto = ProjectSearchResultsDTO()
+        dto.results = [
+            ProjectSearchService.create_result_dto(
+                p,
+                search_dto.preferred_locale,
+                Project.get_project_total_contributions(p[0]),
+            )
+            for p in paginated_results.items
+        ]
+        dto.pagination = Pagination(paginated_results)
+        if search_dto.omit_map_results:
+            return dto
+
         features = []
         for project in all_results:
             # This loop creates a geojson feature collection so you can see all active projects on the map
@@ -183,32 +202,25 @@ class ProjectSearchService:
             )
             features.append(feature)
         feature_collection = geojson.FeatureCollection(features)
-        dto = ProjectSearchResultsDTO()
         dto.map_results = feature_collection
-
-        dto.results = [
-            ProjectSearchService.create_result_dto(
-                p,
-                search_dto.preferred_locale,
-                Project.get_project_total_contributions(p[0]),
-            )
-            for p in paginated_results.items
-        ]
-        dto.pagination = Pagination(paginated_results)
 
         return dto
 
     @staticmethod
     def _filter_projects(search_dto: ProjectSearchDTO, user):
         """ Filters all projects based on criteria provided by user"""
+
         query = ProjectSearchService.create_search_query(user)
+
         query = query.join(ProjectInfo).filter(
             ProjectInfo.locale.in_([search_dto.preferred_locale, "en"])
         )
         project_status_array = []
         if search_dto.project_statuses:
-            for project_status in search_dto.project_statuses:
-                project_status_array.append(ProjectStatus[project_status].value)
+            project_status_array = [
+                ProjectStatus[project_status].value
+                for project_status in search_dto.project_statuses
+            ]
             query = query.filter(Project.status.in_(project_status_array))
         else:
             if not search_dto.created_by:
@@ -224,7 +236,6 @@ class ProjectSearchService:
             projects_mapped = UserService.get_projects_mapped(search_dto.mapped_by)
             query = query.filter(Project.id.in_(projects_mapped))
         if search_dto.favorited_by:
-            user = UserService.get_user_by_id(search_dto.favorited_by)
             projects_favorited = user.favorites
             query = query.filter(
                 Project.id.in_([project.id for project in projects_favorited])
@@ -246,16 +257,16 @@ class ProjectSearchService:
             ).filter(ProjectTeams.team_id == search_dto.team_id)
 
         if search_dto.campaign:
-            query = query.join(Campaign, Project.campaign).group_by(
-                Project.id, Campaign.name
-            )
+            query = query.join(Campaign, Project.campaign).group_by(Campaign.name)
             query = query.filter(Campaign.name == search_dto.campaign)
 
         if search_dto.mapping_types:
             # Construct array of mapping types for query
             mapping_type_array = []
-            for mapping_type in search_dto.mapping_types:
-                mapping_type_array.append(MappingTypes[mapping_type].value)
+            mapping_type_array = [
+                MappingTypes[mapping_type].value
+                for mapping_type in search_dto.mapping_types
+            ]
 
             query = query.filter(Project.mapping_types.contains(mapping_type_array))
 
@@ -268,7 +279,7 @@ class ProjectSearchService:
                 ProjectInfo.text_searchable.match(
                     or_search, postgresql_regconfig="english"
                 ),
-                ProjectInfo.name.like(f"%{or_search}%"),
+                ProjectInfo.name.ilike(f"%{or_search}%"),
             ]
             try:
                 opts.append(Project.id == int(search_dto.text_search))
@@ -290,21 +301,40 @@ class ProjectSearchService:
         if search_dto.order_by_type == "DESC":
             order_by = desc(search_dto.order_by)
 
-        query = query.order_by(order_by).group_by(Project.id)
+        query = query.order_by(order_by).distinct(search_dto.order_by, Project.id)
 
         if search_dto.managed_by and user.role != UserRole.ADMIN.value:
-            team_projects = query.join(ProjectTeams).filter(
-                ProjectTeams.role == TeamRoles.PROJECT_MANAGER.value,
-                ProjectTeams.project_id == Project.id,
-            )
-            user_orgs_list = OrganisationService.get_organisations_managed_by_user(
-                search_dto.managed_by
-            )
-            orgs_managed = [org.id for org in user_orgs_list]
-            org_projects = query.filter(Project.organisation_id.in_(orgs_managed))
-            query = org_projects.union(team_projects)
+            # Get all the projects associated with the user and team.
+            orgs_projects_ids = [[p.id for p in u.projects] for u in user.organisations]
+            orgs_projects_ids = [
+                item for sublist in orgs_projects_ids for item in sublist
+            ]
 
-        all_results = query.all()
+            team_project_ids = [
+                [
+                    p.project_id
+                    for p in u.team.projects
+                    if p.role == TeamRoles.PROJECT_MANAGER.value
+                ]
+                for u in user.teams
+            ]
+            team_project_ids = [
+                item for sublist in team_project_ids for item in sublist
+            ]
+
+            orgs_projects_ids.extend(team_project_ids)
+            ids = tuple(set(orgs_projects_ids))
+            query = query.filter(Project.id.in_(ids))
+
+        all_results = []
+        if not search_dto.omit_map_results:
+            query_result = query
+            query_result.column_descriptions.clear()
+            query_result.add_column(Project.id)
+            query_result.add_column(Project.centroid.ST_AsGeoJSON().label("centroid"))
+            query_result.add_column(Project.priority)
+            all_results = query_result.all()
+
         paginated_results = query.paginate(search_dto.page, 14, True)
 
         return all_results, paginated_results

@@ -1,21 +1,20 @@
 import React from 'react';
-import { Link } from '@reach/router';
+import { useSelector } from 'react-redux';
+import { Link, useLocation, navigate } from '@reach/router';
 import ReactPlaceholder from 'react-placeholder';
 import 'react-placeholder/lib/reactPlaceholder.css';
 import { selectUnit } from '@formatjs/intl-utils';
 import { FormattedRelativeTime, FormattedMessage } from 'react-intl';
 
 import messages from './messages';
-import {
-  MessageAvatar,
-  typesThatUseSystemAvatar,
-  rawHtmlNotification,
-  stripHtmlToText,
-} from './notificationCard';
-import { CloseIcon } from '../../components/svgIcons';
-import { DeleteModal } from '../deleteModal';
+import { MessageAvatar, typesThatUseSystemAvatar, rawHtmlNotification } from './notificationCard';
+import { CloseIcon } from '../svgIcons';
+import { fetchLocalJSONAPI } from '../../network/genericJSONRequest';
+import { DeleteButton } from '../teamsAndOrgs/management';
 
 export const NotificationBodyModal = (props) => {
+  const location = useLocation();
+
   return (
     <div
       style={{
@@ -24,7 +23,7 @@ export const NotificationBodyModal = (props) => {
         display: 'flex',
         'z-index': '999',
       }}
-      onClick={() => props.navigate('../../')}
+      onClick={() => navigate(`../../${location.search}`)}
       className="fixed top-0 left-0 right-0 bottom-0"
     >
       <div
@@ -47,7 +46,7 @@ export const NotificationBodyModal = (props) => {
       >
         <div className={`di fl tl pa3 mb3 w-100 fw5 bb b--tan`}>
           <FormattedMessage {...messages.message} />
-          <Link className={`fr ml4 blue-dark`} to={`../../`}>
+          <Link className={`fr ml4 blue-dark`} to={`../../${location.search}`}>
             <CloseIcon className={`h1 w1 blue-dark`} />
           </Link>
         </div>
@@ -76,6 +75,8 @@ export function NotificationBodyCard({
   loading,
   card: { messageId, name, messageType, fromUsername, subject, message, sentDate },
 }: Object) {
+  const token = useSelector((state) => state.auth.get('token'));
+  const location = useLocation();
   const { value, unit } = selectUnit(new Date((sentDate && new Date(sentDate)) || new Date()));
   const showASendingUser =
     fromUsername || (typesThatUseSystemAvatar.indexOf(messageType) !== -1 && 'System');
@@ -90,6 +91,13 @@ export function NotificationBodyCard({
   if (message !== undefined) {
     replacedMessage = message.replace('task=', 'search=');
   }
+  const deleteNotification = (id) => {
+    fetchLocalJSONAPI(`notifications/${id}/`, token, 'DELETE')
+      .then((success) => navigate(`../../${location.search}`))
+      .catch((e) => {
+        console.log(e.message);
+      });
+  };
 
   return (
     <ReactPlaceholder ready={!loading} type="media" rows={6}>
@@ -110,15 +118,13 @@ export function NotificationBodyCard({
             dangerouslySetInnerHTML={rawHtmlNotification(replacedSubject)}
           ></strong>
           <div
-            className={`pv3 f6 messageBodyLinks bodyCard`}
+            className={`pv3 f6 lh-title messageBodyLinks bodyCard`}
             dangerouslySetInnerHTML={rawHtmlNotification(replacedMessage)}
           />
         </div>
-        <DeleteModal
-          className={`fr bg-red b--grey-light white  ma2 ph4 pv2 `}
-          id={messageId}
-          name={"'" + stripHtmlToText(subject) + "'"}
-          type="notifications"
+        <DeleteButton
+          className={`fr bg-red br1 white ma2 ph4 pv2`}
+          onClick={() => deleteNotification(messageId)}
         />
       </article>
     </ReactPlaceholder>

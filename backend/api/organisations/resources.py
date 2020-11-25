@@ -12,8 +12,8 @@ from backend.services.organisation_service import (
     NotFound,
 )
 
-from backend.services.users.user_service import UserService
 from backend.services.users.authentication_service import token_auth
+from distutils.util import strtobool
 
 
 class OrganisationsRestAPI(Resource):
@@ -163,6 +163,11 @@ class OrganisationsRestAPI(Resource):
               required: true
               type: integer
               default: 1
+            - in: query
+              name: omitManagerList
+              type: boolean
+              description: Set it to true if you don't want the managers list on the response.
+              default: False
         responses:
             200:
                 description: Organisation found
@@ -179,8 +184,10 @@ class OrganisationsRestAPI(Resource):
                 user_id = 0
             else:
                 user_id = authenticated_user_id
+            # Validate abbreviated.
+            omit_managers = strtobool(request.args.get("omitManagerList", "false"))
             organisation_dto = OrganisationService.get_organisation_by_id_as_dto(
-                organisation_id, user_id
+                organisation_id, user_id, omit_managers
             )
             return organisation_dto.to_primitive(), 200
         except NotFound:
@@ -293,6 +300,11 @@ class OrganisationsAllAPI(Resource):
               description: Filter projects on managers with this user_id
               required: false
               type: integer
+            - in: query
+              name: omitManagerList
+              type: boolean
+              description: Set it to true if you don't want the managers list on the response.
+              default: False
         responses:
             200:
                 description: Organisations found
@@ -315,26 +327,24 @@ class OrganisationsAllAPI(Resource):
         except Exception:
             manager_user_id = None
 
-        if manager_user_id is not None:
-            try:
-                # Check whether user is admin (can do any query) or user is checking for own projects
-                if (
-                    not UserService.is_user_an_admin(authenticated_user_id)
-                    and authenticated_user_id != manager_user_id
-                ):
-                    raise ValueError
+        if manager_user_id is not None and not authenticated_user_id:
+            return (
+                {
+                    "Error": "Unauthorized - Filter by manager_user_id is not allowed to unauthenticated requests"
+                },
+                403,
+            )
 
-            except Exception:
-                return {"Error": "Unauthorized - Not allowed"}, 403
-
+        # Validate abbreviated.
+        omit_managers = strtobool(request.args.get("omitManagerList", "false"))
         # Obtain organisations
         try:
             results_dto = OrganisationService.get_organisations_as_dto(
-                manager_user_id, authenticated_user_id
+                manager_user_id, authenticated_user_id, omit_managers
             )
             return results_dto.to_primitive(), 200
         except NotFound:
-            return {"Error": "No projects found"}, 404
+            return {"Error": "No organisations found"}, 404
         except Exception as e:
             error_msg = f"Organisations GET - unhandled error: {str(e)}"
             current_app.logger.critical(error_msg)

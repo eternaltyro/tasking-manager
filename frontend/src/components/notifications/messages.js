@@ -24,6 +24,10 @@ export default defineMessages({
     id: 'notifications.filter.tasks',
     defaultMessage: 'Tasks',
   },
+  teams: {
+    id: 'notifications.filter.teams',
+    defaultMessage: 'Teams',
+  },
   projects: {
     id: 'notifications.filter.projects',
     defaultMessage: 'Projects',
@@ -48,9 +52,13 @@ export default defineMessages({
     id: 'notifications.pagination.count',
     defaultMessage: 'Showing {number} of {total}',
   },
-  xNew: {
-    id: 'notifications.nav.xNew',
-    defaultMessage: '{xNew} New',
+  oneNewNotification: {
+    id: 'notifications.nav.new.one',
+    defaultMessage: '1 new message',
+  },
+  newNotifications: {
+    id: 'notifications.nav.new.plural',
+    defaultMessage: '{n} new messages',
   },
   viewAll: {
     id: 'notifications.nav.viewAll',
@@ -107,6 +115,10 @@ export default defineMessages({
   BROADCAST: {
     id: 'notifications.message.type.broadcast',
     defaultMessage: 'Broadcast',
+  },
+  TEAM_BROADCAST: {
+    id: 'notifications.message.type.team',
+    defaultMessage: 'Team announcement',
   },
   MENTION_NOTIFICATION: {
     id: 'notifications.message.type.mention_notification',

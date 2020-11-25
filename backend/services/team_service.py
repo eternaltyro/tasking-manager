@@ -1,17 +1,18 @@
 from flask import current_app
 from sqlalchemy import and_
+from markdown import markdown
 
-from backend import db
+from backend import create_app, db
 from backend.models.dtos.team_dto import (
     TeamDTO,
     NewTeamDTO,
     TeamsListDTO,
-    TeamMembersDTO,
     ProjectTeamDTO,
-    TeamProjectDTO,
     TeamDetailsDTO,
 )
-from backend.models.dtos.organisation_dto import OrganisationProjectsDTO
+
+from backend.models.dtos.message_dto import MessageDTO
+from backend.models.postgis.message import Message, MessageType
 from backend.models.postgis.team import Team, TeamMembers
 from backend.models.postgis.project import ProjectTeams
 from backend.models.postgis.project_info import ProjectInfo
@@ -31,7 +32,7 @@ class TeamServiceError(Exception):
 
     def __init__(self, message):
         if current_app:
-            current_app.logger.error(message)
+            current_app.logger.debug(message)
 
 
 class TeamJoinNotAllowed(Exception):
@@ -39,7 +40,7 @@ class TeamJoinNotAllowed(Exception):
 
     def __init__(self, message):
         if current_app:
-            current_app.logger.error(message)
+            current_app.logger.debug(message)
 
 
 class TeamService:
@@ -79,10 +80,10 @@ class TeamService:
             TeamService.add_team_member(team_id, user.id, role, active)
 
             if team.invite_only:
-                team_managers = TeamService._get_team_managers(team_id)
+                team_managers = team.get_team_managers()
                 for member in team_managers:
                     MessageService.send_request_to_join_team(
-                        user.id, user.username, member.user_id, team.name
+                        user.id, user.username, member.user_id, team.name, team_id
                     )
 
     @staticmethod
@@ -91,7 +92,7 @@ class TeamService:
         from_user = UserService.get_user_by_id(from_user_id)
         team = TeamService.get_team_by_id(team_id)
         MessageService.send_invite_to_join_team(
-            from_user_id, from_user.username, to_user.id, team.name
+            from_user_id, from_user.username, to_user.id, team.name, team_id
         )
 
     @staticmethod
@@ -100,7 +101,7 @@ class TeamService:
         to_user_id = UserService.get_user_by_username(username).id
         team = TeamService.get_team_by_id(team_id)
         MessageService.accept_reject_request_to_join_team(
-            from_user_id, from_user.username, to_user_id, team.name, action
+            from_user_id, from_user.username, to_user_id, team.name, team_id, action
         )
 
         is_member = TeamService.is_user_team_member(team_id, to_user_id)
@@ -127,7 +128,7 @@ class TeamService:
         from_user = UserService.get_user_by_id(from_user_id)
         to_user = UserService.get_user_by_username(username)
         team = TeamService.get_team_by_id(team_id)
-        team_members = TeamService._get_team_managers(team_id)
+        team_members = team.get_team_managers()
 
         for member in team_members:
             MessageService.accept_reject_invitation_request_for_team(
@@ -136,6 +137,7 @@ class TeamService:
                 member.user_id,
                 to_user.username,
                 team.name,
+                team_id,
                 action,
             )
         if action == "accept":
@@ -184,9 +186,10 @@ class TeamService:
         member_request_filter: int = None,
         manager_filter: int = None,
         organisation_filter: int = None,
+        omit_members: bool = False,
     ) -> TeamsListDTO:
 
-        query = db.session.query(Team).outerjoin(TeamMembers).outerjoin(ProjectTeams)
+        query = db.session.query(Team)
 
         orgs_query = None
         is_admin = UserService.is_user_an_admin(user_id)
@@ -199,7 +202,9 @@ class TeamService:
                 TeamMembers.user_id == manager_filter,
                 TeamMembers.active == True,  # noqa
                 TeamMembers.function == TeamMemberFunctions.MANAGER.value,
+                Team.id == TeamMembers.team_id,
             )
+
             manager_orgs_teams = query.filter(
                 Team.organisation_id.in_(
                     [
@@ -208,29 +213,46 @@ class TeamService:
                     ]
                 )
             )
+
             query = manager_teams.union(manager_orgs_teams)
 
         if team_name_filter:
-            query = query.filter(Team.name.contains(team_name_filter))
+            query = query.filter(
+                Team.name.ilike("%" + team_name_filter + "%"),
+            )
 
         if team_role_filter:
             try:
                 role = TeamRoles[team_role_filter.upper()].value
-                query = query.filter(ProjectTeams.role == role)
+                project_teams = (
+                    db.session.query(ProjectTeams)
+                    .filter(ProjectTeams.role == role)
+                    .subquery()
+                )
+                query = query.join(project_teams)
             except KeyError:
                 pass
 
         if member_filter:
-            query = query.filter(
-                TeamMembers.user_id == member_filter, TeamMembers.active == True  # noqa
+            team_member = (
+                db.session.query(TeamMembers)
+                .filter(
+                    TeamMembers.user_id == member_filter, TeamMembers.active.is_(True)
+                )
+                .subquery()
             )
+            query = query.join(team_member)
 
         if member_request_filter:
-            query = query.filter(
-                TeamMembers.user_id == member_request_filter,
-                TeamMembers.active == False,  # noqa
+            team_member = (
+                db.session.query(TeamMembers)
+                .filter(
+                    TeamMembers.user_id == member_request_filter,
+                    TeamMembers.active.is_(False),
+                )
+                .subquery()
             )
-
+            query = query.join(team_member)
         if orgs_query:
             query = query.union(orgs_query)
 
@@ -247,32 +269,26 @@ class TeamService:
             team_dto.organisation = team.organisation.name
             team_dto.organisation_id = team.organisation.id
             team_dto.members = []
-            team_members = TeamService._get_team_members(team.id)
-            is_team_manager = False
-            is_team_member = False
-            for member in team_members:
-                user = UserService.get_user_by_id(member.user_id)
-                member_dto = TeamMembersDTO()
-                member_dto.username = user.username
-                member_dto.function = TeamMemberFunctions(member.function).name
-                if member.user_id == user_id:
-                    is_team_member = True
-                    if member_dto.function == "MANAGER":
-                        is_team_manager = True
-                member_dto.picture_url = user.picture_url
-                member_dto.active = member.active
+            is_team_member = TeamService.is_user_an_active_team_member(team.id, user_id)
+            # Skip if members are not included
+            if not omit_members:
+                team_members = team.members
 
-                team_dto.members.append(member_dto)
+                team_dto.members = [
+                    team.as_dto_team_member(member) for member in team_members
+                ]
+
             if team_dto.visibility == "PRIVATE" and not is_admin:
-                if is_team_manager or is_team_member:
+                if is_team_member:
                     teams_list_dto.teams.append(team_dto)
             else:
                 teams_list_dto.teams.append(team_dto)
-
         return teams_list_dto
 
     @staticmethod
-    def get_team_as_dto(team_id: int, user_id: int) -> TeamDTO:
+    def get_team_as_dto(
+        team_id: int, user_id: int, abbreviated: bool
+    ) -> TeamDetailsDTO:
         team = TeamService.get_team_by_id(team_id)
 
         if team is None:
@@ -300,40 +316,21 @@ class TeamService:
             team_dto.is_general_admin = False
             team_dto.is_org_admin = False
 
-        team_members = TeamService._get_team_members(team_id)
-        for member in team_members:
-            user = UserService.get_user_by_id(member.user_id)
-            member_dto = TeamMembersDTO()
-            member_dto.username = user.username
-            member_dto.pictureUrl = user.picture_url
-            member_dto.function = TeamMemberFunctions(member.function).name
-            member_dto.picture_url = user.picture_url
-            member_dto.active = member.active
+        if abbreviated:
+            return team_dto
 
-            team_dto.members.append(member_dto)
+        team_dto.members = [team.as_dto_team_member(member) for member in team.members]
 
         team_projects = TeamService.get_projects_by_team_id(team.id)
-        for team_project in team_projects:
-            project_team_dto = TeamProjectDTO()
-            project_team_dto.project_name = team_project.name
-            project_team_dto.project_id = team_project.project_id
-            project_team_dto.role = TeamRoles(team_project.role).name
 
-            team_dto.team_projects.append(project_team_dto)
-
-        org_projects = OrganisationService.get_projects_by_organisation_id(
-            team.organisation.id
-        )
-        for org_project in org_projects:
-            org_project_dto = OrganisationProjectsDTO()
-            org_project_dto.project_id = org_project.id
-            org_project_dto.project_name = org_project.name
-            team_dto.organisation_projects.append(org_project_dto)
+        team_dto.team_projects = [
+            team.as_dto_team_project(project) for project in team_projects
+        ]
 
         return team_dto
 
     @staticmethod
-    def get_projects_by_team_id(team_id: int) -> ProjectInfo:
+    def get_projects_by_team_id(team_id: int):
         projects = (
             db.session.query(
                 ProjectInfo.name, ProjectTeams.project_id, ProjectTeams.role
@@ -403,7 +400,7 @@ class TeamService:
     def create_team(new_team_dto: NewTeamDTO) -> int:
         """
         Creates a new team using a team dto
-        :param team_dto: Team DTO
+        :param new_team_dto: Team DTO
         :returns: ID of new Team
         """
         TeamService.assert_validate_organisation(new_team_dto.organisation_id)
@@ -455,14 +452,12 @@ class TeamService:
             team_dto.members = members
 
     @staticmethod
-    def _get_team_managers(team_id: int):
-        return TeamMembers.query.filter_by(
-            team_id=team_id, function=TeamMemberFunctions.MANAGER.value, active=True
-        ).all()
-
-    @staticmethod
     def _get_team_members(team_id: int):
         return TeamMembers.query.filter_by(team_id=team_id).all()
+
+    @staticmethod
+    def _get_active_team_members(team_id: int):
+        return TeamMembers.query.filter_by(team_id=team_id, active=True).all()
 
     @staticmethod
     def activate_team_member(team_id: int, user_id: int):
@@ -483,7 +478,8 @@ class TeamService:
     @staticmethod
     def is_user_team_member(team_id: int, user_id: int):
         query = TeamMembers.query.filter(
-            TeamMembers.team_id == team_id, TeamMembers.user_id == user_id,
+            TeamMembers.team_id == team_id,
+            TeamMembers.user_id == user_id,
         ).exists()
         return db.session.query(query).scalar()
 
@@ -499,10 +495,11 @@ class TeamService:
     @staticmethod
     def is_user_team_manager(team_id: int, user_id: int):
         # Admin manages all teams
+        team = Team.get(team_id)
         if UserService.is_user_an_admin(user_id):
             return True
 
-        managers = TeamService._get_team_managers(team_id)
+        managers = team.get_team_managers()
         for member in managers:
             if member.user_id == user_id:
                 return True
@@ -511,7 +508,7 @@ class TeamService:
         user_managed_orgs = [
             org.id for org in OrganisationService.get_organisations(user_id)
         ]
-        if Team.get(team_id).organisation_id in user_managed_orgs:
+        if team.organisation_id in user_managed_orgs:
             return True
 
         return False
@@ -539,3 +536,36 @@ class TeamService:
             if TeamService.is_user_an_active_team_member(team_dto.team_id, user_id)
         ]
         return len(user_membership) > 0
+
+    @staticmethod
+    def send_message_to_all_team_members(
+        team_id: int, team_name: str, message_dto: MessageDTO
+    ):
+        """Sends supplied message to all contributors in a team.  Message all team members can take
+        over a minute to run, so this method is expected to be called on its own thread"""
+        app = (
+            create_app()
+        )  # Because message-all run on background thread it needs it's own app context
+
+        with app.app_context():
+            team_members = TeamService._get_active_team_members(team_id)
+            sender = UserService.get_user_by_id(message_dto.from_user_id).username
+
+            message_dto.message = (
+                "A message from {}, manager of {} team:<br/><br/>{}".format(
+                    MessageService.get_user_profile_link(sender),
+                    MessageService.get_team_link(team_name, team_id, False),
+                    markdown(message_dto.message, output_format="html"),
+                )
+            )
+
+            messages = []
+            for team_member in team_members:
+                if team_member.user_id != message_dto.from_user_id:
+                    message = Message.from_dto(team_member.user_id, message_dto)
+                    message.message_type = MessageType.TEAM_BROADCAST.value
+                    message.save()
+                    user = UserService.get_user_by_id(team_member.user_id)
+                    messages.append(dict(message=message, user=user))
+
+            MessageService._push_messages(messages)

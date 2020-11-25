@@ -11,16 +11,15 @@
     <meta name="application-name" content="Tasking Manager" />
 
   	<!-- for Facebook -->
-  	<meta property="og:title" content="Tasking Manager" />
-  	<meta property="og:site_name" content="Tasking Manager" />
+  	<meta property="og:title" content="%REACT_APP_ORG_CODE% Tasking Manager" />
+  	<meta property="og:site_name" content="%REACT_APP_ORG_CODE% Tasking Manager" />
   	<meta property="og:type" content="website" />
   	<meta property="og:description" content="Collaborative mapping for humanitarian action." />
 
       <!-- for Twitter -->
   	<meta name="twitter:card" content="summary" />
-  	<meta name="twitter:title" content="Tasking Manager" />
+  	<meta name="twitter:title" content="%REACT_APP_ORG_CODE% Tasking Manager" />
   	<meta name="twitter:description" content="Collaborative mapping for humanitarian action." />
-
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
@@ -54,8 +53,8 @@
       _paq.push(['trackPageView']);
       _paq.push(['enableLinkTracking']);   // Tracks downloads
       _paq.push(['trackVisibleContentImpressions']);  // Tracks content blocks
-      var site_id = %REACT_APP_MATOMO_ID%;
-      if (typeof site_id !== 'undefined') {
+      var site_id = "%REACT_APP_MATOMO_ID%";
+      if (site_id && "%REACT_APP_MATOMO_ENDPOINT%") {
         (function() {
           var u="%REACT_APP_MATOMO_ENDPOINT%";
           _paq.push(['setTrackerUrl', u+'piwik.php']);

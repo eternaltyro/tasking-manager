@@ -176,7 +176,7 @@ export default defineMessages({
   },
   validateAllError: {
     id: 'projects.actions.validate_all_tasks.error',
-    defaultMessage: 'Invalidating all the tasks failed for an unknown reason.',
+    defaultMessage: 'Validating all the tasks failed for an unknown reason.',
   },
   resetBadImagery: {
     id: 'projects.actions.reset_bad_imagery_tasks.title',
@@ -247,7 +247,7 @@ export default defineMessages({
   },
   transferProjectSuccess: {
     id: 'projects.actions.transfer_project.success',
-    defaultMessage: 'The project was transfered successfully.',
+    defaultMessage: 'The project was transferred successfully.',
   },
   transferProjectError: {
     id: 'projects.actions.transfer_project.error',
@@ -358,6 +358,15 @@ export default defineMessages({
   name: {
     id: 'projects.formInputs.name',
     defaultMessage: 'Name of the project',
+  },
+  dueDate: {
+    id: 'projects.formInputs.dueDate',
+    defaultMessage: 'Due date',
+  },
+  dueDateDescription: {
+    id: 'projects.formInputs.dueDate.description',
+    defaultMessage:
+      'Define the ideal date to have the project finished. The date format is day/month/year.',
   },
   description: {
     id: 'projects.formInputs.description',

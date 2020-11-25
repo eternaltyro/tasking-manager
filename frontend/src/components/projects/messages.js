@@ -24,6 +24,10 @@ export default defineMessages({
     id: 'project.nav.showMapToggle',
     defaultMessage: 'Show map',
   },
+  listViewToggle: {
+    id: 'project.nav.listViewToggle',
+    defaultMessage: 'List view',
+  },
   typesOfMapping: {
     id: 'project.navFilters.typesOfMapping',
     defaultMessage: 'Types of mapping',
@@ -133,7 +137,7 @@ export default defineMessages({
     defaultMessage: 'Urgent projects',
   },
   sortByBeginner: {
-    id: 'project.sortby.difficulty.begginer',
+    id: 'project.sortby.difficulty.beginner',
     defaultMessage: 'Beginner projects',
   },
   sortByAdvanced: {

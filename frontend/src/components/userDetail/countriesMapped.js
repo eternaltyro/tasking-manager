@@ -8,7 +8,7 @@ import { FormattedMessage } from 'react-intl';
 import messages from './messages';
 import { MAPBOX_TOKEN, MAP_STYLE, MAPBOX_RTL_PLUGIN_URL } from '../../config';
 import { mapboxLayerDefn } from '../projects/projectsMap';
-import { ListElements } from './topProjects';
+import { BarListChart } from './barListChart';
 
 mapboxgl.accessToken = MAPBOX_TOKEN;
 try {
@@ -19,15 +19,8 @@ try {
 
 const UserCountriesMap = ({ projects }) => {
   const locale = useSelector((state) => state.preferences['locale']);
-  const geojson = {
-    type: 'FeatureCollection',
-    features: projects.mappedProjects.map((f) => {
-      return { type: 'Feature', geometry: f.centroid, properties: { projectId: f.projectId } };
-    }),
-  };
 
   const [map, setMap] = useState(null);
-
   const mapRef = React.createRef();
 
   useLayoutEffect(() => {
@@ -50,11 +43,17 @@ const UserCountriesMap = ({ projects }) => {
   }, []);
 
   useLayoutEffect(() => {
-    if (map) {
+    if (map && projects.mappedProjects) {
+      const geojson = {
+        type: 'FeatureCollection',
+        features: projects.mappedProjects.map((f) => {
+          return { type: 'Feature', geometry: f.centroid, properties: { projectId: f.projectId } };
+        }),
+      };
       map.resize(); //https://docs.mapbox.com/help/troubleshooting/blank-tiles/
       map.on('load', () => mapboxLayerDefn(map, geojson, (id) => navigate(`/projects/${id}/`)));
     }
-  }, [map, geojson]);
+  }, [map, projects.mappedProjects]);
 
   return <div id="map" className="w-two-thirds-l w-100 h-100 fl" ref={mapRef}></div>;
 };
@@ -69,18 +68,24 @@ export const CountriesMapped = ({ projects, userStats }) => {
   });
 
   return (
-    <div className="bg-white blue-dark shadow-4 w-100 cf" style={{ height: '40vh' }}>
+    <div className="bg-white blue-dark shadow-4 w-100 cf" style={{ height: '23rem' }}>
       <div className="w-third-l w-100 fl pt2 ph3">
         <h3 className="f4 mt0 fw6 pt3">
           <FormattedMessage {...messages.topCountriesTitle} />
         </h3>
-        <ListElements
-          data={countriesPercent}
-          valueField={'total'}
-          nameField={'name'}
-          linkBase={'/explore/?location='}
-          linkField={'name'}
-        />
+        {countriesPercent.length > 0 ? (
+          <BarListChart
+            data={countriesPercent}
+            valueField={'total'}
+            nameField={'name'}
+            linkBase={'/explore/?location='}
+            linkField={'name'}
+          />
+        ) : (
+          <div className="h-100 tc pv5 blue-grey">
+            <FormattedMessage {...messages.noProjectsData} />
+          </div>
+        )}
       </div>
       <UserCountriesMap projects={projects} />
     </div>

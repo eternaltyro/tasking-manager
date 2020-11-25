@@ -10,7 +10,7 @@ class OSMServiceError(Exception):
 
     def __init__(self, message):
         if current_app:
-            current_app.logger.error(message)
+            current_app.logger.debug(message)
 
 
 class OSMService:
@@ -21,7 +21,9 @@ class OSMService:
         :param user_id: user_id in scope
         :raises OSMServiceError
         """
-        osm_user_details_url = f"http://www.openstreetmap.org/api/0.6/user/{user_id}"
+        osm_user_details_url = (
+            f"{current_app.config['OSM_SERVER_URL']}/api/0.6/user/{user_id}"
+        )
         response = requests.get(osm_user_details_url)
 
         if response.status_code != 200:

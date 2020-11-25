@@ -44,7 +44,7 @@ export default defineMessages({
   },
   lockErrorLicenseDescription: {
     id: 'project.tasks.lock_error.license.description',
-    defaultMessage: 'Please accept this license in order to colaborate in this project. ',
+    defaultMessage: 'Please accept this license in order to collaborate in this project. ',
   },
   acceptLicense: {
     id: 'project.tasks.lock_error.license.accept',
@@ -97,26 +97,6 @@ export default defineMessages({
   typesOfMapping: {
     id: 'project.typesOfMapping',
     defaultMessage: 'Types of Mapping',
-  },
-  roads: {
-    id: 'project.typesOfMapping.roads',
-    defaultMessage: 'Roads',
-  },
-  buildings: {
-    id: 'project.typesOfMapping.buildings',
-    defaultMessage: 'Buildings',
-  },
-  landUse: {
-    id: 'project.typesOfMapping.landUse',
-    defaultMessage: 'Land use',
-  },
-  waterways: {
-    id: 'project.typesOfMapping.waterways',
-    defaultMessage: 'Waterways',
-  },
-  other: {
-    id: 'project.typesOfMapping.other',
-    defaultMessage: 'Other',
   },
   editor: {
     id: 'project.editor',
@@ -216,7 +196,8 @@ export default defineMessages({
   },
   validateSelectedTask: {
     id: 'project.selectTask.footer.button.validateSelectedTask',
-    defaultMessage: 'Validate selected task',
+    defaultMessage:
+      '{number, plural, one {Validate selected task} other {Validate # selected tasks}}',
   },
   validateAnotherTask: {
     id: 'project.selectTask.footer.button.validateAnotherTask',
@@ -432,14 +413,14 @@ export default defineMessages({
   },
   taskActivity: {
     id: 'project.tasks.history.title',
-    defaultMessage: 'Task activity',
+    defaultMessage: 'Task {n}',
   },
-  taskSplitted: {
-    id: 'project.tasks.history.splitted',
+  taskUnavailable: {
+    id: 'project.tasks.history.unavailable',
     defaultMessage: 'Task unavailable',
   },
-  taskSplittedDescription: {
-    id: 'project.tasks.history.splitted.description',
+  taskSplitDescription: {
+    id: 'project.tasks.history.split.description',
     defaultMessage: 'The task {id} was split and its history is not available anymore',
   },
   taskData: {
@@ -554,7 +535,22 @@ export default defineMessages({
     id: 'project.level.new_users',
     defaultMessage: 'New users',
   },
-
+  statistics: {
+    id: 'project.contributions.stats',
+    defaultMessage: 'Statistics',
+  },
+  mappedByUser: {
+    id: 'project.contributions.user.select.mapped',
+    defaultMessage: 'Select tasks mapped by {username}',
+  },
+  validatedByUser: {
+    id: 'project.contributions.user.select.validated',
+    defaultMessage: 'Select tasks validated by {username}',
+  },
+  allUserTasks: {
+    id: 'project.contributions.user.select.all',
+    defaultMessage: 'Select all tasks mapped or validated by {username}',
+  },
   permissionErrorTitle: {
     id: 'project.permissions.error.title',
     defaultMessage: 'You are not ready to work on this project...',

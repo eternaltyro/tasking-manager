@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { navigate } from '@reach/router';
 import ReactPlaceholder from 'react-placeholder';
@@ -12,11 +12,12 @@ import { HeaderLine } from '../projectDetail/header';
 import { Button } from '../button';
 import Portal from '../portal';
 import { SidebarIcon } from '../svgIcons';
-import { openEditor } from '../../utils/openEditor';
+import { openEditor, getTaskGpxUrl, formatImageryUrl } from '../../utils/openEditor';
 import { TaskHistory } from './taskActivity';
 import { ChangesetCommentTags } from './changesetComment';
 import { useSetProjectPageTitleTag } from '../../hooks/UseMetaTags';
-import DueDateBox from '../projectcard/dueDateBox';
+import { useFetch } from '../../hooks/UseFetch';
+import { DueDateBox } from '../projectCard/dueDateBox';
 import {
   CompletionTabForMapping,
   CompletionTabForValidation,
@@ -29,12 +30,10 @@ const Editor = React.lazy(() => import('../editor'));
 export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, action, editor }) {
   useSetProjectPageTitleTag(project);
   const userDetails = useSelector((state) => state.auth.get('userDetails'));
-  const locale = useSelector((state) => state.preferences.locale);
   const [activeSection, setActiveSection] = useState('completion');
   const [activeEditor, setActiveEditor] = useState(editor);
   const [showSidebar, setShowSidebar] = useState(true);
   const tasksIds = activeTasks ? activeTasks.map((task) => task.taskId) : [];
-  const [editorRef, setEditorRef] = useState(null);
   const [disabled, setDisable] = useState(false);
   const [taskComment, setTaskComment] = useState('');
   const [selectedStatus, setSelectedStatus] = useState();
@@ -42,6 +41,14 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
   const activeTask = activeTasks && activeTasks[0];
   const timer = new Date(activeTask.lastUpdated);
   timer.setSeconds(timer.getSeconds() + activeTask.autoUnlockSeconds);
+  //eslint-disable-next-line
+  const [taskHistoryError, taskHistoryLoading, taskHistory] = useFetch(
+    `projects/${project.projectId}/tasks/${tasksIds[0]}/`,
+    project.projectId && tasksIds && tasksIds.length === 1,
+  );
+
+  const getTaskGpxUrlCallback = useCallback((project, tasks) => getTaskGpxUrl(project, tasks), []);
+  const formatImageryUrlCallback = useCallback((imagery) => formatImageryUrl(imagery), []);
 
   useEffect(() => {
     if (!editor && projectIsReady && userDetails.defaultEditor && tasks && tasksIds) {
@@ -62,7 +69,6 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
         tasksIds,
         [window.innerWidth, window.innerHeight],
         null,
-        locale,
       );
       if (url) {
         navigate(`./${url}`);
@@ -70,7 +76,7 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
         navigate(`./?editor=${editorToUse[0]}`);
       }
     }
-  }, [editor, project, projectIsReady, userDetails.defaultEditor, action, tasks, tasksIds, locale]);
+  }, [editor, project, projectIsReady, userDetails.defaultEditor, action, tasks, tasksIds]);
 
   const callEditor = (arr) => {
     setActiveEditor(arr[0].value);
@@ -81,7 +87,6 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
       tasksIds,
       [window.innerWidth, window.innerHeight],
       null,
-      locale,
     );
     if (url) {
       navigate(`./${url}`);
@@ -92,7 +97,7 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
 
   return (
     <Portal>
-      <div className="cf w-100 vh-minus-122-ns overflow-y-hidden">
+      <div className="cf w-100 vh-minus-77-ns overflow-y-hidden">
         <div className={`fl h-100 relative ${showSidebar ? 'w-70' : 'w-100-minus-4rem'}`}>
           {editor === 'ID' ? (
             <React.Suspense
@@ -108,11 +113,11 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
               }
             >
               <Editor
-                editorRef={editorRef}
-                setEditorRef={setEditorRef}
                 setDisable={setDisable}
                 comment={project.changesetComment}
                 presets={project.idPresets}
+                imageryUrl={formatImageryUrlCallback(project.imagery)}
+                gpxUrl={getTaskGpxUrlCallback(project.projectId, tasksIds)}
               />
             </React.Suspense>
           ) : (
@@ -140,9 +145,7 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
               rows={3}
               ready={typeof project.projectId === 'number' && project.projectId > 0}
             >
-              {activeEditor === 'ID' && (
-                <SidebarToggle setShowSidebar={setShowSidebar} editorRef={editorRef} />
-              )}
+              {activeEditor === 'ID' && <SidebarToggle setShowSidebar={setShowSidebar} />}
               <HeaderLine
                 author={project.author}
                 projectId={project.projectId}
@@ -188,12 +191,22 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
                   </span>
                   {activeTasks && activeTasks.length === 1 && (
                     <span
-                      className={`mr4-l mr3 pb2 pointer ${
+                      className={`pb2 pointer truncate ${
                         activeSection === 'history' && 'bb b--blue-dark'
                       }`}
                       onClick={() => setActiveSection('history')}
                     >
                       <FormattedMessage {...messages.history} />
+                      {taskHistory &&
+                        taskHistory.taskHistory &&
+                        taskHistory.taskHistory.length > 1 && (
+                          <div
+                            className="bg-red white dib br-100 tc f6 ml1 mb1 v-mid"
+                            style={{ height: '1.125rem', width: '1.125rem' }}
+                          >
+                            {taskHistory.taskHistory.length}
+                          </div>
+                        )}
                     </span>
                   )}
                 </div>
@@ -278,7 +291,11 @@ export function TaskMapAction({ project, projectIsReady, tasks, activeTasks, act
                   </>
                 )}
                 {activeSection === 'history' && (
-                  <TaskHistory projectId={project.projectId} taskId={tasksIds[0]} />
+                  <TaskHistory
+                    projectId={project.projectId}
+                    taskId={tasksIds[0]}
+                    commentPayload={taskHistory}
+                  />
                 )}
               </div>
             </ReactPlaceholder>

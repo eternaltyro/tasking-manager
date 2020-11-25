@@ -1,5 +1,4 @@
 import datetime
-import os
 import xml.etree.ElementTree as ET
 
 from flask import current_app
@@ -25,7 +24,7 @@ class MappingServiceError(Exception):
 
     def __init__(self, message):
         if current_app:
-            current_app.logger.error(message)
+            current_app.logger.debug(message)
 
 
 class MappingService:
@@ -44,7 +43,9 @@ class MappingService:
 
     @staticmethod
     def get_task_as_dto(
-        task_id: int, project_id: int, preferred_local: str = "en",
+        task_id: int,
+        project_id: int,
+        preferred_local: str = "en",
     ) -> TaskDTO:
         """ Get task as DTO for transmission over API """
         task = MappingService.get_task(task_id, project_id)
@@ -94,7 +95,7 @@ class MappingService:
                 raise UserLicenseError("User must accept license to map this task")
             else:
                 raise MappingServiceError(
-                    f"Mapping not allowed because: {error_reason.name}"
+                    f"Mapping not allowed because: {error_reason}"
                 )
 
         task.lock_task_for_mapping(lock_task_dto.user_id)
@@ -128,13 +129,12 @@ class MappingService:
 
         if mapped_task.comment:
             # Parses comment to see if any users have been @'d
-            if "CI" not in os.environ.keys():
-                MessageService.send_message_after_comment(
-                    mapped_task.user_id,
-                    mapped_task.comment,
-                    task.id,
-                    mapped_task.project_id,
-                )
+            MessageService.send_message_after_comment(
+                mapped_task.user_id,
+                mapped_task.comment,
+                task.id,
+                mapped_task.project_id,
+            )
 
         task.unlock_task(mapped_task.user_id, new_state, mapped_task.comment)
 
@@ -142,7 +142,7 @@ class MappingService:
 
     @staticmethod
     def stop_mapping_task(stop_task: StopMappingTaskDTO) -> TaskDTO:
-        """ Unlocks the task and sets the task history appropriately """
+        """ Unlocks the task and revert the task status to the last one """
         task = MappingService.get_task_locked_by_user(
             stop_task.project_id, stop_task.task_id, stop_task.user_id
         )
@@ -262,8 +262,8 @@ class MappingService:
 
     @staticmethod
     def generate_osm_xml(project_id: int, task_ids_str: str) -> str:
-        """ Generate xml response suitable for loading into JOSM.  A sample output file is in
-            /backend/helpers/testfiles/osm-sample.xml """
+        """Generate xml response suitable for loading into JOSM.  A sample output file is in
+        /backend/helpers/testfiles/osm-sample.xml"""
         # Note XML created with upload No to ensure it will be rejected by OSM if uploaded by mistake
         root = ET.Element(
             "osm",

@@ -1,6 +1,6 @@
 from cachetools import TTLCache, cached
 
-from sqlalchemy import func, text, desc, cast, extract, or_
+from sqlalchemy import func, desc, cast, extract, or_
 from sqlalchemy.sql.functions import coalesce
 from sqlalchemy.types import Time
 from backend import db
@@ -18,6 +18,8 @@ from backend.models.dtos.stats_dto import (
 )
 
 from backend.models.dtos.project_dto import ProjectSearchResultsDTO
+from backend.models.postgis.campaign import Campaign, campaign_projects
+from backend.models.postgis.organisation import Organisation
 from backend.models.postgis.project import Project
 from backend.models.postgis.statuses import TaskStatus, MappingLevel
 from backend.models.postgis.task import TaskHistory, User, Task, TaskAction
@@ -127,7 +129,8 @@ class StatsService:
             )
             .join(User)
             .filter(
-                TaskHistory.project_id == project_id, TaskHistory.action != "COMMENT"
+                TaskHistory.project_id == project_id,
+                TaskHistory.action != TaskAction.COMMENT.name,
             )
             .order_by(TaskHistory.action_date.desc())
             .paginate(page, 10, True)
@@ -150,16 +153,16 @@ class StatsService:
     @staticmethod
     def get_popular_projects() -> ProjectSearchResultsDTO:
         """ Get all projects ordered by task_history """
+
         rate_func = func.count(TaskHistory.user_id) / extract(
             "epoch", func.sum(cast(TaskHistory.action_date, Time))
         )
 
-        query = TaskHistory.query.with_entities(
-            TaskHistory.project_id.label("id"), rate_func.label("rate")
-        )
-        # Implement filters.
         query = (
-            query.filter(TaskHistory.action_date >= date.today() - timedelta(days=90))
+            TaskHistory.query.with_entities(
+                TaskHistory.project_id.label("id"), rate_func.label("rate")
+            )
+            .filter(TaskHistory.action_date >= date.today() - timedelta(days=90))
             .filter(
                 or_(
                     TaskHistory.action == TaskAction.LOCKED_FOR_MAPPING.name,
@@ -168,17 +171,14 @@ class StatsService:
             )
             .filter(TaskHistory.action_text is not None)
             .filter(TaskHistory.action_text != "")
-        )
-        # Group by and order by.
-        sq = (
-            query.group_by(TaskHistory.project_id)
+            .group_by(TaskHistory.project_id)
             .order_by(desc("rate"))
             .limit(10)
             .subquery()
         )
-        projects_query = ProjectSearchService.create_search_query()
-        projects = projects_query.filter(Project.id == sq.c.id)
 
+        projects_query = ProjectSearchService.create_search_query()
+        projects = projects_query.filter(Project.id == query.c.id).all()
         # Get total contributors.
         contrib_counts = ProjectSearchService.get_total_contributions(projects)
         zip_items = zip(projects, contrib_counts)
@@ -193,45 +193,51 @@ class StatsService:
     @staticmethod
     def get_last_activity(project_id: int) -> ProjectLastActivityDTO:
         """ Gets the last activity for a project's tasks """
+        sq = (
+            TaskHistory.query.with_entities(
+                TaskHistory.task_id,
+                TaskHistory.action_date,
+                TaskHistory.user_id,
+            )
+            .filter(TaskHistory.project_id == project_id)
+            .filter(TaskHistory.action != TaskAction.COMMENT.name)
+            .order_by(TaskHistory.task_id, TaskHistory.action_date.desc())
+            .distinct(TaskHistory.task_id)
+            .subquery()
+        )
 
+        sq_statuses = (
+            Task.query.with_entities(Task.id, Task.task_status)
+            .filter(Task.project_id == project_id)
+            .subquery()
+        )
         results = (
             db.session.query(
-                Task.id,
-                Task.project_id,
-                Task.task_status,
-                Task.locked_by,
-                Task.mapped_by,
-                Task.validated_by,
+                sq_statuses.c.id,
+                sq.c.action_date,
+                sq_statuses.c.task_status,
+                User.username,
             )
-            .filter(Task.project_id == project_id)
-            .order_by(Task.id.asc())
+            .outerjoin(sq, sq.c.task_id == sq_statuses.c.id)
+            .outerjoin(User, User.id == sq.c.user_id)
+            .order_by(sq_statuses.c.id)
+            .all()
         )
-        last_activity_dto = ProjectLastActivityDTO()
 
-        for item in results:
-            latest = TaskStatusDTO()
-            latest.task_id = item.id
-            latest.task_status = TaskStatus(item.task_status).name
-            latest_activity = (
-                db.session.query(
-                    TaskHistory.action_date, TaskHistory.action, User.username
+        dto = ProjectLastActivityDTO()
+        dto.activity = [
+            TaskStatusDTO(
+                dict(
+                    task_id=r.id,
+                    task_status=TaskStatus(r.task_status).name,
+                    action_date=r.action_date,
+                    action_by=r.username,
                 )
-                .join(User)
-                .filter(
-                    TaskHistory.task_id == item.id,
-                    TaskHistory.project_id == project_id,
-                    TaskHistory.action != "COMMENT",
-                    User.id == TaskHistory.user_id,
-                )
-                .order_by(TaskHistory.id.desc())
-                .first()
             )
-            if latest_activity:
-                latest.action_date = latest_activity[0]
-                latest.action_by = latest_activity[2]
-            last_activity_dto.activity.append(latest)
+            for r in results
+        ]
 
-        return last_activity_dto
+        return dto
 
     @staticmethod
     def get_user_contributions(project_id: int) -> ProjectContributionsDTO:
@@ -272,12 +278,21 @@ class StatsService:
                     coalesce(mapped_stmt.c.count, 0)
                     + coalesce(validated_stmt.c.count, 0)
                 ).label("total"),
-                (mapped_stmt.c.task_ids + validated_stmt.c.task_ids).label("task_ids"),
+                mapped_stmt.c.task_ids.label("mapped_tasks"),
+                validated_stmt.c.task_ids.label("validated_tasks"),
             )
             .outerjoin(
-                validated_stmt, mapped_stmt.c.mapped_by == validated_stmt.c.validated_by
+                validated_stmt,
+                mapped_stmt.c.mapped_by == validated_stmt.c.validated_by,
+                full=True,
             )
-            .join(User, User.id == mapped_stmt.c.mapped_by)
+            .join(
+                User,
+                or_(
+                    User.id == mapped_stmt.c.mapped_by,
+                    User.id == validated_stmt.c.validated_by,
+                ),
+            )
             .order_by(desc("total"))
             .all()
         )
@@ -293,7 +308,10 @@ class StatsService:
                     mapped=r.mapped,
                     validated=r.validated,
                     total=r.total,
-                    task_ids=r.task_ids,
+                    mapped_tasks=r.mapped_tasks if r.mapped_tasks is not None else [],
+                    validated_tasks=r.validated_tasks
+                    if r.validated_tasks is not None
+                    else [],
                     date_registered=r.date_registered.date(),
                 )
             )
@@ -308,18 +326,24 @@ class StatsService:
     def get_homepage_stats(abbrev=True) -> HomePageStatsDTO:
         """ Get overall TM stats to give community a feel for progress that's being made """
         dto = HomePageStatsDTO()
-
-        dto.total_projects = Project.query.count()
+        dto.total_projects = Project.query.with_entities(
+            func.count(Project.id)
+        ).scalar()
         dto.mappers_online = (
-            Task.query.filter(Task.locked_by is not None)
-            .distinct(Task.locked_by)
-            .count()
+            Task.query.with_entities(func.count(Task.locked_by.distinct()))
+            .filter(Task.locked_by.isnot(None))
+            .scalar()
         )
-        dto.total_mappers = User.query.count()
-        dto.tasks_mapped = Task.query.filter(
-            Task.task_status.in_((TaskStatus.MAPPED.value, TaskStatus.VALIDATED.value))
-        ).count()
-
+        dto.total_mappers = User.query.with_entities(func.count(User.id)).scalar()
+        dto.tasks_mapped = (
+            Task.query.with_entities(func.count())
+            .filter(
+                Task.task_status.in_(
+                    (TaskStatus.MAPPED.value, TaskStatus.VALIDATED.value)
+                )
+            )
+            .scalar()
+        )
         if not abbrev:
             dto.total_validators = (
                 Task.query.filter(Task.task_status == TaskStatus.VALIDATED.value)
@@ -329,70 +353,81 @@ class StatsService:
             dto.tasks_validated = Task.query.filter(
                 Task.task_status == TaskStatus.VALIDATED.value
             ).count()
-            total_area_sql = """select coalesce(sum(ST_Area(geometry,true)/1000000),0) as sum
-                                  from public.projects as area"""
-            total_area_result = db.engine.execute(total_area_sql)
 
-            dto.total_area = total_area_result.fetchone()["sum"]
+            dto.total_area = Project.query.with_entities(
+                func.coalesce(func.sum(func.ST_Area(Project.geometry, True) / 1000000))
+            ).scalar()
 
-            tasks_mapped_sql = """select coalesce(sum(ST_Area(geometry, true)/1000000), 0) as sum from public.tasks
-                                 where task_status = :task_status"""
-            tasks_mapped_result = db.engine.execute(
-                text(tasks_mapped_sql), task_status=TaskStatus.MAPPED.value
+            dto.total_mapped_area = (
+                Task.query.with_entities(
+                    func.coalesce(func.sum(func.ST_Area(Task.geometry, True) / 1000000))
+                )
+                .filter(Task.task_status == TaskStatus.MAPPED.value)
+                .scalar()
             )
 
-            dto.total_mapped_area = tasks_mapped_result.fetchone()["sum"]
-
-            tasks_validated_sql = """select coalesce(sum(ST_Area(geometry, true)/1000000), 0) as sum from public.tasks
-                                     where task_status = :task_status"""
-            tasks_validated_result = db.engine.execute(
-                text(tasks_validated_sql), task_status=TaskStatus.VALIDATED.value
+            dto.total_validated_area = (
+                Task.query.with_entities(
+                    func.coalesce(func.sum(func.ST_Area(Task.geometry, True) / 1000000))
+                )
+                .filter(Task.task_status == TaskStatus.VALIDATED.value)
+                .scalar()
             )
 
-            dto.total_validated_area = tasks_validated_result.fetchone()["sum"]
+            unique_campaigns = Campaign.query.with_entities(
+                func.count(Campaign.id)
+            ).scalar()
 
-            unique_campaigns_sql = "select count(name) as sum from campaigns"
+            linked_campaigns_count = (
+                Campaign.query.join(
+                    campaign_projects, Campaign.id == campaign_projects.c.campaign_id
+                )
+                .with_entities(
+                    Campaign.name, func.count(campaign_projects.c.campaign_id)
+                )
+                .group_by(Campaign.id)
+                .all()
+            )
 
-            unique_campaigns = db.engine.execute(unique_campaigns_sql).fetchone()["sum"]
-
-            linked_campaigns_sql = "select campaigns.name, count(campaign_projects.campaign_id) from campaigns INNER JOIN campaign_projects\
-                ON campaigns.id=campaign_projects.campaign_id group by campaigns.id"
-
-            linked_campaigns_count = db.engine.execute(linked_campaigns_sql).fetchall()
-
-            no_campaign_count_sql = "select count(*) as project_count from projects where id not in \
-                (select distinct project_id from campaign_projects order by project_id)"
-            no_campaign_count = db.engine.execute(no_campaign_count_sql).fetchone()[
-                "project_count"
-            ]
-
-            for tup in linked_campaigns_count:
-                campaign_stats = CampaignStatsDTO(tup)
-                dto.campaigns.append(campaign_stats)
-
+            subquery = (
+                db.session.query(campaign_projects.c.project_id.distinct())
+                .order_by(campaign_projects.c.project_id)
+                .subquery()
+            )
+            no_campaign_count = (
+                Project.query.with_entities(func.count())
+                .filter(~Project.id.in_(subquery))
+                .scalar()
+            )
+            dto.campaigns = [CampaignStatsDTO(row) for row in linked_campaigns_count]
             if no_campaign_count:
-                no_campaign_proj = CampaignStatsDTO(("Unassociated", no_campaign_count))
-                dto.campaigns.append(no_campaign_proj)
+                dto.campaigns.append(
+                    CampaignStatsDTO(("Unassociated", no_campaign_count))
+                )
 
             dto.total_campaigns = unique_campaigns
+            unique_orgs = Organisation.query.with_entities(
+                func.count(Organisation.id)
+            ).scalar()
 
-            unique_orgs_sql = "select count(name) as sum from organisations"
-            unique_orgs = db.engine.execute(unique_orgs_sql).fetchone()["sum"]
+            linked_orgs_count = (
+                db.session.query(Organisation.name, func.count(Project.organisation_id))
+                .join(Project.organisation)
+                .group_by(Organisation.id)
+                .all()
+            )
 
-            linked_orgs_sql = "select organisations.name, count(projects.organisation_id) from projects INNER JOIN organisations\
-                ON organisations.id=projects.organisation_id group by organisations.id"
-            linked_orgs_count = db.engine.execute(linked_orgs_sql).fetchall()
-
-            no_org_project_count = 0
-            no_org_project_count_sql = "select count(*) as project_count from organisations where id not in \
-                (select distinct organisation_id from projects order by organisation_id)"
-            no_org_project_count = db.engine.execute(
-                no_org_project_count_sql
-            ).fetchone()["project_count"]
-
-            for tup in linked_orgs_count:
-                org_stats = OrganizationStatsDTO(tup)
-                dto.organizations.append(org_stats)
+            subquery = (
+                db.session.query(Project.organisation_id.distinct())
+                .order_by(Project.organisation_id)
+                .subquery()
+            )
+            no_org_project_count = (
+                Organisation.query.with_entities(func.count())
+                .filter(~Organisation.id.in_(subquery))
+                .scalar()
+            )
+            dto.organisations = [OrganizationStatsDTO(row) for row in linked_orgs_count]
 
             if no_org_project_count:
                 no_org_proj = OrganizationStatsDTO(

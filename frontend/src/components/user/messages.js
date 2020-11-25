@@ -16,6 +16,10 @@ export default defineMessages({
     id: 'user.name',
     defaultMessage: 'Name',
   },
+  organisations: {
+    id: 'user.organisations',
+    defaultMessage: 'Organizations',
+  },
   city: {
     id: 'user.city',
     defaultMessage: 'City',
@@ -50,7 +54,11 @@ export default defineMessages({
   },
   slackUsername: {
     id: 'user.slack',
-    defaultMessage: 'Username on HOT Slack',
+    defaultMessage: 'Username on {org} Slack',
+  },
+  urlDetectedError: {
+    id: 'user.personalInfo.error',
+    defaultMessage: 'Type only your username, not the URL.',
   },
   save: {
     id: 'user.form.save',
@@ -106,15 +114,27 @@ export default defineMessages({
   },
   mentions: {
     id: 'user.notifications.mentions',
-    defaultMessage: 'Mentions',
+    defaultMessage: 'Mentions emails',
   },
   mentionsDescription: {
     id: 'user.notifications.mentions.description',
-    defaultMessage: "Every time you're mentioned on a comment, you get a notification.",
+    defaultMessage: 'Receive an email every time your username is mentioned on a comment.',
+  },
+  teamUpdates: {
+    id: 'user.notifications.teams',
+    defaultMessage: 'Team announcements emails',
+  },
+  teamUpdatesDescription: {
+    id: 'user.notifications.teams.description',
+    defaultMessage: 'Receive emails with announcements sent by team managers.',
   },
   projectUpdates: {
     id: 'user.notifications.projects',
     defaultMessage: 'Project updates',
+  },
+  taskUpdates: {
+    id: 'user.notifications.tasks',
+    defaultMessage: 'Tasks validation emails',
   },
   required: {
     id: 'user.settings.required',
@@ -124,6 +144,10 @@ export default defineMessages({
     id: 'user.notifications.projects.description',
     defaultMessage: 'You get a notification when a project you have contributed to makes progress.',
   },
+  taskUpdatesDescription: {
+    id: 'user.notifications.task.description',
+    defaultMessage: 'Receive an email when a task you have contributed to is validated.',
+  },
   comments: {
     id: 'user.notifications.comments',
     defaultMessage: 'Comments',
@@ -131,7 +155,7 @@ export default defineMessages({
   commentsDescription: {
     id: 'user.notifications.comments.description',
     defaultMessage:
-      "You get a notification every time someone comments on the project you've contributed to.",
+      'Receive a notification every time someone posts a comment on projects or tasks you have contributed to.',
   },
   learnHow: {
     id: 'user.settings.become_validator.button',

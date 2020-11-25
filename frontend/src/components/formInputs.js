@@ -7,6 +7,7 @@ import { FormattedMessage } from 'react-intl';
 import messages from './messages';
 import { formatCountryList } from '../utils/countries';
 import { fetchLocalJSONAPI } from '../network/genericJSONRequest';
+import { CheckIcon } from './svgIcons';
 
 export const RadioField = ({ name, value, className }: Object) => (
   <Field
@@ -45,8 +46,8 @@ export function OrganisationSelect({ className }: Object) {
 
   useEffect(() => {
     if (token && userDetails && userDetails.id) {
-      const query = userDetails.role === 'ADMIN' ? '' : `?manager_user_id=${userDetails.id}`;
-      fetchLocalJSONAPI(`organisations/${query}`, token)
+      const query = userDetails.role === 'ADMIN' ? '' : `&manager_user_id=${userDetails.id}`;
+      fetchLocalJSONAPI(`organisations/?omitManagerList=true${query}`, token)
         .then((result) => setOrganisations(result.organisations))
         .catch((e) => console.log(e));
     }
@@ -108,3 +109,68 @@ export function UserCountrySelect({ className }: Object) {
     </Field>
   );
 }
+
+const CheckBoxInput = ({ isActive, changeState, className = '' }) => (
+  <div
+    role="checkbox"
+    aria-checked={isActive}
+    onClick={changeState}
+    onKeyPress={changeState}
+    tabIndex="0"
+    className={`bg-white w1 h1 ma1 ba bw1 b--red br1 relative pointer ${className}`}
+  >
+    {isActive ? <div className="bg-red ba b--white bw1 br1 w-100 h-100"></div> : <></>}
+  </div>
+);
+
+export const CheckBox = ({ activeItems, toggleFn, itemId }) => {
+  const isActive = activeItems.includes(itemId);
+  const changeState = (e) => {
+    e.persist();
+    e.preventDefault();
+    e.stopPropagation();
+
+    let copy = activeItems;
+    if (copy.includes(itemId)) {
+      copy = copy.filter((s) => s !== itemId);
+    } else {
+      copy = [...copy, itemId];
+    }
+    toggleFn(copy);
+  };
+
+  return <CheckBoxInput changeState={changeState} isActive={isActive} />;
+};
+
+export const SelectAll = ({ selected, setSelected, allItems, className }) => {
+  const isActive = selected.length === allItems.length;
+  const changeState = (e) => {
+    e.preventDefault();
+    if (isActive) {
+      setSelected([]);
+    } else {
+      setSelected(allItems);
+    }
+  };
+
+  return <CheckBoxInput changeState={changeState} isActive={isActive} className={className} />;
+};
+
+export const InterestsList = ({ interests, field, changeSelect }) => (
+  <ul className="list w-100 pa0 flex flex-wrap">
+    {interests.map((i) => (
+      <li
+        onClick={() => changeSelect(i.id)}
+        className={`${
+          i[field] === true ? 'b--blue-dark bw1' : 'b--grey-light'
+        } bg-white w-30-ns w-100 ba pa3 f6 tc mb2 mr3 relative ttc pointer`}
+        key={i.id}
+      >
+        {i.name}
+        {i[field] === true && (
+          <CheckIcon className="f7 pa1 br-100 bg-black white absolute right-0 top-0" />
+        )}
+      </li>
+    ))}
+  </ul>
+);

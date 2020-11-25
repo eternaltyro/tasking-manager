@@ -11,13 +11,16 @@ import { ProjectSearchBox } from './projectSearchBox';
 import ClearFilters from './clearFilters';
 import { ProjectFilterSelect } from './filterSelectFields';
 import { OrderBySelector } from './orderBy';
-import { ShowMapToggle } from './projectNav';
+import { ShowMapToggle, ProjetListViewToggle } from './projectNav';
 import { CustomButton } from '../button';
 
 export const MyProjectNav = (props) => {
   const userDetails = useSelector((state) => state.auth.get('userDetails'));
   const isOrgManager = useSelector(
     (state) => state.auth.get('organisations') && state.auth.get('organisations').length > 0,
+  );
+  const isPMTeamMember = useSelector(
+    (state) => state.auth.get('pmTeams') && state.auth.get('pmTeams').length > 0,
   );
   const [fullProjectsQuery, setQuery] = useExploreProjectsQueryParams();
   const notAnyFilter = !stringify(fullProjectsQuery);
@@ -72,78 +75,113 @@ export const MyProjectNav = (props) => {
               )}
             </div>
           </div>
+          <div className="mt1 mb3 cf">
+            {!props.management && (
+              <>
+                <FilterButton
+                  query={fullProjectsQuery}
+                  newQueryParams={{
+                    favoritedByMe: undefined,
+                    mappedByMe: 1,
+                    managedByMe: undefined,
+                    createdByMe: undefined,
+                    status: undefined,
+                  }}
+                  setQuery={setQuery}
+                  isActive={isActiveButton('mappedByMe', fullProjectsQuery)}
+                >
+                  <FormattedMessage {...messages.contributed} />
+                </FilterButton>
+                <FilterButton
+                  query={fullProjectsQuery}
+                  newQueryParams={{
+                    favoritedByMe: 1,
+                    mappedByMe: undefined,
+                    managedByMe: undefined,
+                    createdByMe: undefined,
+                    status: undefined,
+                  }}
+                  setQuery={setQuery}
+                  isActive={isActiveButton('favoritedByMe', fullProjectsQuery)}
+                >
+                  <FormattedMessage {...messages.favorited} />
+                </FilterButton>
+                {(isPMTeamMember || isOrgManager) && (
+                  <FilterButton
+                    query={fullProjectsQuery}
+                    newQueryParams={{
+                      favoritedByMe: undefined,
+                      mappedByMe: undefined,
+                      createdByMe: undefined,
+                      managedByMe: 1,
+                      status: undefined,
+                    }}
+                    setQuery={setQuery}
+                    isActive={fullProjectsQuery.managedByMe}
+                  >
+                    <FormattedMessage {...messages.managed} />
+                  </FilterButton>
+                )}
+                <FilterButton
+                  query={fullProjectsQuery}
+                  newQueryParams={{
+                    favoritedByMe: undefined,
+                    mappedByMe: undefined,
+                    managedByMe: undefined,
+                    createdByMe: 1,
+                    status: undefined,
+                  }}
+                  setQuery={setQuery}
+                  isActive={isActiveButton('createdByMe', fullProjectsQuery)}
+                >
+                  <FormattedMessage {...messages.created} />
+                </FilterButton>
+              </>
+            )}
+            {props.management && (userDetails.role === 'ADMIN' || isOrgManager) && (
+              <>
+                <FilterButton
+                  query={fullProjectsQuery}
+                  newQueryParams={{ status: 'PUBLISHED', managedByMe: 1, createdByMe: undefined }}
+                  setQuery={setQuery}
+                  isActive={
+                    fullProjectsQuery.managedByMe && fullProjectsQuery.status === 'PUBLISHED'
+                  }
+                >
+                  <FormattedMessage {...messages.active} />
+                </FilterButton>
+                <FilterButton
+                  query={fullProjectsQuery}
+                  newQueryParams={{ status: 'DRAFT', managedByMe: 1, createdByMe: undefined }}
+                  setQuery={setQuery}
+                  isActive={isActiveButton('DRAFT', fullProjectsQuery)}
+                >
+                  <FormattedMessage {...messages.draft} />
+                </FilterButton>
+                <FilterButton
+                  query={fullProjectsQuery}
+                  newQueryParams={{ status: 'ARCHIVED', managedByMe: 1, createdByMe: undefined }}
+                  setQuery={setQuery}
+                  isActive={isActiveButton('ARCHIVED', fullProjectsQuery)}
+                >
+                  <FormattedMessage {...messages.archived} />
+                </FilterButton>
+                <FilterButton
+                  query={fullProjectsQuery}
+                  newQueryParams={{ status: undefined, managedByMe: undefined, createdByMe: 1 }}
+                  setQuery={setQuery}
+                  isActive={isActiveButton('createdByMe', fullProjectsQuery)}
+                >
+                  <FormattedMessage {...messages.created} />
+                </FilterButton>
+              </>
+            )}
+          </div>
         </div>
-        <div className="w-10-ns w-100 fr">
+        <div className="w-10-ns w-100 fr tr">
           <ShowMapToggle />
+          {props.management && <ProjetListViewToggle />}
         </div>
-      </div>
-      <div className="mt1 mb3">
-        {!props.management && (
-          <>
-            <FilterButton
-              query={fullProjectsQuery}
-              newQueryParams={{
-                favoritedByMe: undefined,
-                mappedByMe: 1,
-                managedByMe: undefined,
-                status: undefined,
-              }}
-              setQuery={setQuery}
-              isActive={isActiveButton('mappedByMe', fullProjectsQuery)}
-            >
-              <FormattedMessage {...messages.contributed} />
-            </FilterButton>
-            <FilterButton
-              query={fullProjectsQuery}
-              newQueryParams={{
-                favoritedByMe: 1,
-                mappedByMe: undefined,
-                managedByMe: undefined,
-                status: undefined,
-              }}
-              setQuery={setQuery}
-              isActive={isActiveButton('favoritedByMe', fullProjectsQuery)}
-            >
-              <FormattedMessage {...messages.favorited} />
-            </FilterButton>
-          </>
-        )}
-        {props.management && (userDetails.role === 'ADMIN' || isOrgManager) && (
-          <>
-            <FilterButton
-              query={fullProjectsQuery}
-              newQueryParams={{ status: 'PUBLISHED', managedByMe: 1, createdByMe: undefined }}
-              setQuery={setQuery}
-              isActive={fullProjectsQuery.managedByMe && fullProjectsQuery.status === 'PUBLISHED'}
-            >
-              <FormattedMessage {...messages.active} />
-            </FilterButton>
-            <FilterButton
-              query={fullProjectsQuery}
-              newQueryParams={{ status: 'DRAFT', managedByMe: 1, createdByMe: undefined }}
-              setQuery={setQuery}
-              isActive={isActiveButton('DRAFT', fullProjectsQuery)}
-            >
-              <FormattedMessage {...messages.draft} />
-            </FilterButton>
-            <FilterButton
-              query={fullProjectsQuery}
-              newQueryParams={{ status: 'ARCHIVED', managedByMe: 1, createdByMe: undefined }}
-              setQuery={setQuery}
-              isActive={isActiveButton('ARCHIVED', fullProjectsQuery)}
-            >
-              <FormattedMessage {...messages.archived} />
-            </FilterButton>
-            <FilterButton
-              query={fullProjectsQuery}
-              newQueryParams={{ status: undefined, managedByMe: undefined, createdByMe: 1 }}
-              setQuery={setQuery}
-              isActive={isActiveButton('createdByMe', fullProjectsQuery)}
-            >
-              <FormattedMessage {...messages.created} />
-            </FilterButton>
-          </>
-        )}
       </div>
       {props.children}
     </header>
@@ -166,7 +204,9 @@ function ManagerFilters({ query, setQuery }: Object) {
   const userDetails = useSelector((state) => state.auth.get('userDetails'));
   const [campaignsError, campaignsLoading, campaigns] = useFetch('campaigns/');
   const [orgsError, orgsLoading, organisations] = useFetch(
-    `organisations/${userDetails.role === 'ADMIN' ? '' : `?manager_user_id=${userDetails.id}`}`,
+    `organisations/?omitManagerList=true${
+      userDetails.role === 'ADMIN' ? '' : `&manager_user_id=${userDetails.id}`
+    }`,
     userDetails && userDetails.id,
   );
   const { campaign: campaignInQuery, organisation: orgInQuery } = query;

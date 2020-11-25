@@ -115,6 +115,18 @@ const Parameters = {
   TaskingManagerURL: {
     Description: 'URL for setting CNAME in Distribution; Ex: example.hotosm.org',
     Type: 'String'
+  },
+  TaskingManagerOrgName: {
+    Description: 'Org Name',
+    Type: 'String'
+  },
+  TaskingManagerOrgCode: {
+    Description: 'Org Code',
+    Type: 'String'
+  },
+  SentryBackendDSN: {
+    Description: "DSN for sentry",
+    Type: 'String'
   }
 };
 
@@ -149,6 +161,7 @@ const Resources = {
     UpdatePolicy: {
       AutoScalingRollingUpdate: {
         PauseTime: 'PT60M',
+        MaxBatchSize: 2,
         WaitOnResourceSignals: true
       }
     }
@@ -310,10 +323,6 @@ const Resources = {
         'sudo apt-get -y install python3.6-dev',
         'sudo apt-get -y install python3.6-venv',
         'sudo apt-get -y install curl',
-        'curl -o install-node10.sh -sL https://deb.nodesource.com/setup_10.x',
-        'sudo chmod +x install-node10.sh',
-        'sudo ./install-node10.sh',
-        'sudo apt-get -y install nodejs',
         'wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -',
         'sudo sh -c \'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -sc)-pgdg main" > /etc/apt/sources.list.d/PostgreSQL.list\'',
         'sudo apt-get update -y',
@@ -361,6 +370,7 @@ const Resources = {
         cf.sub('export POSTGRES_PASSWORD="${PostgresPassword}"'),
         cf.sub('export POSTGRES_USER="${PostgresUser}"'),
         cf.sub('export TM_APP_BASE_URL="${TaskingManagerAppBaseUrl}"'),
+        cf.sub('export TM_ENVIRONMENT="${AWS::StackName}"'),
         cf.sub('export TM_CONSUMER_KEY="${TaskingManagerConsumerKey}"'),
         cf.sub('export TM_CONSUMER_SECRET="${TaskingManagerConsumerSecret}"'),
         cf.sub('export TM_SECRET="${TaskingManagerSecret}"'),
@@ -373,13 +383,18 @@ const Resources = {
         cf.sub('export TM_EMAIL_CONTACT_ADDRESS="${TaskingManagerEmailContactAddress}"'),
         cf.sub('export TM_LOG_LEVEL="${TaskingManagerLogLevel}"'),
         cf.sub('export TM_LOG_DIR="${TaskingManagerLogDirectory}"'),
+        cf.sub('export TM_ORG_NAME="${TaskingManagerOrgName}"'),
+        cf.sub('export TM_ORG_CODE="${TaskingManagerOrgCode}"'),
         cf.sub('export TM_IMAGE_UPLOAD_API_URL="${TaskingManagerImageUploadAPIURL}"'),
         cf.sub('export TM_IMAGE_UPLOAD_API_KEY="${TaskingManagerImageUploadAPIKey}"'),
         'psql "host=$POSTGRES_ENDPOINT dbname=$POSTGRES_DB user=$POSTGRES_USER password=$POSTGRES_PASSWORD" -c "CREATE EXTENSION IF NOT EXISTS postgis"',
         cf.if('DatabaseDumpFileGiven', cf.sub('aws s3 cp ${DatabaseDump} dump.sql; sudo -u postgres psql "postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_ENDPOINT/$POSTGRES_DB" < dump.sql'), ''),
         './venv/bin/python3.6 manage.py db upgrade',
         'echo "------------------------------------------------------------"',
-        cf.sub('gunicorn -b 0.0.0.0:8000 --worker-class gevent --workers 5 --timeout 179 --access-logfile ${TaskingManagerLogDirectory}/gunicorn-access.log manage:application &'),
+        cf.sub('export NEW_RELIC_LICENSE_KEY="${NewRelicLicense}"'),
+        cf.sub('export TM_SENTRY_BACKEND_DSN="${SentryBackendDSN}"'),
+        'export NEW_RELIC_ENVIRONMENT=$TM_ENVIRONMENT',
+        cf.sub('NEW_RELIC_CONFIG_FILE=./scripts/aws/cloudformation/newrelic.ini newrelic-admin run-program gunicorn -b 0.0.0.0:8000 --worker-class gevent --workers 5 --timeout 179 --access-logfile ${TaskingManagerLogDirectory}/gunicorn-access.log --access-logformat \'%(h)s %(l)s %(u)s %(t)s \"%(r)s\" %(s)s %(b)s %(T)s \"%(f)s\" \"%(a)s\"\' manage:application &'),
         cf.sub('sudo cfn-init -v --stack ${AWS::StackName} --resource TaskingManagerLaunchConfiguration --region ${AWS::Region} --configsets default'),
         cf.sub('cfn-signal --exit-code $? --region ${AWS::Region} --resource TaskingManagerASG --stack ${AWS::StackName}')
       ]),

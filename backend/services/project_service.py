@@ -1,6 +1,5 @@
 from cachetools import TTLCache, cached
 from flask import current_app
-from backend import db
 from backend.models.dtos.mapping_dto import TaskDTOs
 from backend.models.dtos.project_dto import (
     ProjectDTO,
@@ -38,7 +37,7 @@ class ProjectServiceError(Exception):
 
     def __init__(self, message):
         if current_app:
-            current_app.logger.error(message)
+            current_app.logger.debug(message)
 
 
 class ProjectService:
@@ -52,8 +51,10 @@ class ProjectService:
 
     @staticmethod
     def exists(project_id: int) -> bool:
-        query = Project.query.filter_by(id=project_id).exists()
-        return db.session.query(query).scalar()
+        project = Project.exists(project_id)
+        if project is None:
+            raise NotFound()
+        return True
 
     @staticmethod
     def get_project_by_name(project_id: int) -> Project:
@@ -66,6 +67,23 @@ class ProjectService:
     @staticmethod
     def auto_unlock_tasks(project_id: int):
         Task.auto_unlock_tasks(project_id)
+
+    @staticmethod
+    def delete_tasks(project_id: int, tasks_ids):
+        # Validate project exists.
+        project = Project.get(project_id)
+        if project is None:
+            raise NotFound({"project": project_id})
+
+        tasks = [{"id": i, "obj": Task.get(i, project_id)} for i in tasks_ids]
+
+        # In case a task is not found.
+        not_found = [t["id"] for t in tasks if t["obj"] is None]
+        if len(not_found) > 0:
+            raise NotFound({"tasks": not_found})
+
+        # Delete task one by one.
+        [t["obj"].delete() for t in tasks]
 
     @staticmethod
     def get_contribs_by_day(project_id: int) -> ProjectContribsDTO:
@@ -90,7 +108,7 @@ class ProjectService:
             )
             .group_by("action_text", "day", "task_id")
             .order_by("day")
-        )
+        ).all()
 
         contribs_dto = ProjectContribsDTO()
         # Filter and store unique dates
@@ -187,8 +205,10 @@ class ProjectService:
         is_manager_permission = False
 
         if current_user_id:
-            is_manager_permission = ProjectAdminService.is_user_action_permitted_on_project(
-                current_user_id, project_id
+            is_manager_permission = (
+                ProjectAdminService.is_user_action_permitted_on_project(
+                    current_user_id, project_id
+                )
             )
         # Draft Projects - admins, authors, org admins & team managers permitted
         if project.status == ProjectStatus.DRAFT.value:
@@ -514,6 +534,7 @@ class ProjectService:
         return project.get_project_title(preferred_locale)
 
     @staticmethod
+    @cached(TTLCache(maxsize=1024, ttl=600))
     def get_project_stats(project_id: int) -> ProjectStatsDTO:
         """ Gets the project stats DTO """
         project = ProjectService.get_project_by_id(project_id)

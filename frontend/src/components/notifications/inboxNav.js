@@ -21,7 +21,7 @@ const isActiveButton = (buttonName, projectQuery) => {
   }
 };
 
-export const InboxNavMini = props => {
+export const InboxNavMini = (props) => {
   return (
     /* mb1 mb2-ns (removed for map, but now small gap for more-filters) */
     <header className="">
@@ -33,12 +33,19 @@ export const InboxNavMini = props => {
           {props.newMsgCount > 0 && (
             <Link
               to="/inbox?orderBy=read&orderByType=DESC"
-              onClick={e => {
+              onClick={(e) => {
                 props.setPopoutFocus(false);
               }}
             >
               <div className="dib fr br2 core-font b--white ba bg-red grey-light f7 mv3 pa2">
-                <FormattedMessage {...messages.xNew} values={{ xNew: props.newMsgCount || 0 }} />
+                {props.newMsgCount === 1 ? (
+                  <FormattedMessage {...messages.oneNewNotification} />
+                ) : (
+                  <FormattedMessage
+                    {...messages.newNotifications}
+                    values={{ n: props.newMsgCount }}
+                  />
+                )}
               </div>
             </Link>
           )}
@@ -47,14 +54,14 @@ export const InboxNavMini = props => {
     </header>
   );
 };
-export const InboxNavMiniBottom = props => {
+export const InboxNavMiniBottom = (props) => {
   return (
     /* mb1 mb2-ns (removed for map, but now small gap for more-filters) */
     <footer className={`relative h2 w-100 ${props.className || ''}`}>
       <Link
         className="absolute hover-darken tc pv2 w-100 b--grey-light ba bg-red white f6 no-underline"
         to="/inbox"
-        onClick={e => {
+        onClick={(e) => {
           props.setPopoutFocus(false);
         }}
       >
@@ -68,7 +75,7 @@ export const InboxNavMiniBottom = props => {
   );
 };
 
-export const InboxNav = props => {
+export const InboxNav = (props) => {
   const [inboxQuery, setInboxQuery] = useInboxQueryParams();
 
   const linkCombo = 'link ph3 f6 pv2 ba b--grey-light';
@@ -86,9 +93,8 @@ export const InboxNav = props => {
         <div className="w-100 fl dib">
           <div className="dib w-40">
             <div className="mv2 dib"></div>
-
             <FormattedMessage {...contributionsMessages.searchProject}>
-              {msg => {
+              {(msg) => {
                 return (
                   <ProjectSearchBox
                     className="dib fl mh1 w-40"
@@ -106,7 +112,7 @@ export const InboxNav = props => {
               allQueryParams={inboxQuery}
             />
             {!notAnyFilter && (
-              <Link to="./" className="red link ph3 f6 v-mid pv2 mh1 mt1 mt2-ns fr">
+              <Link to="./" className="red link ph3 f6 v-mid pv2 mh1 mt1 mt2-ns dib">
                 <FormattedMessage {...messages.clearFilters} />
               </Link>
             )}
@@ -130,16 +136,22 @@ export const InboxNav = props => {
           <FormattedMessage {...messages.messages} />
         </Link>
         <Link
+          to="?orderBy=date&orderByType=desc&page=1&pageSize=10&types=2,9,10"
+          className={`di di-m mh1 ${isActiveButton(['2', '9', '10'], inboxQuery)}  ${linkCombo} `}
+        >
+          <FormattedMessage {...messages.projects} />
+        </Link>
+        <Link
           to={'?orderBy=date&orderByType=desc&page=1&pageSize=10&types=8,4,5'}
           className={`di di-m mh1 ${isActiveButton(['8', '4', '5'], inboxQuery)}  ${linkCombo} `}
         >
           <FormattedMessage {...messages.tasks} />
         </Link>
         <Link
-          to="?orderBy=date&orderByType=desc&page=1&pageSize=10&types=2,9,10"
-          className={`di di-m mh1 ${isActiveButton(['2', '9', '10'], inboxQuery)}  ${linkCombo} `}
+          to={'?orderBy=date&orderByType=desc&page=1&pageSize=10&types=6,7,11'}
+          className={`di di-m mh1 ${isActiveButton(['6', '7', '11'], inboxQuery)}  ${linkCombo} `}
         >
-          <FormattedMessage {...messages.projects} />
+          <FormattedMessage {...messages.teams} />
         </Link>
       </div>
       {props.children}

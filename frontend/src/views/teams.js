@@ -25,6 +25,7 @@ import {
   TeamsManagement,
   TeamSideBar,
 } from '../components/teamsAndOrgs/teams';
+import { MessageMembers } from '../components/teamsAndOrgs/messageMembers';
 import { Projects } from '../components/teamsAndOrgs/projects';
 import { FormSubmitButton, CustomButton } from '../components/button';
 import { DeleteModal } from '../components/deleteModal';
@@ -338,6 +339,8 @@ export function EditTeam(props) {
           addMembers={addMembers}
           updateRequests={setRequests}
         />
+        <div className="h1"></div>
+        <MessageMembers teamId={team.teamId} />
       </div>
     </div>
   );
@@ -350,7 +353,7 @@ export function TeamDetail(props) {
   const [error, loading, team] = useFetch(`teams/${props.id}/`);
   // eslint-disable-next-line
   const [projectsError, projectsLoading, projects] = useFetch(
-    `projects/?teamId=${props.id}`,
+    `projects/?teamId=${props.id}&omitMapResults=true`,
     props.id,
   );
   const [isMember, setIsMember] = useState(false);

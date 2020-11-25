@@ -7,7 +7,7 @@ import { FormattedMessage } from 'react-intl';
 
 import messages from './messages';
 import { IMAGE_UPLOAD_SERVICE } from '../../config';
-import { pushToLocalJSONAPI } from '../../network/genericJSONRequest';
+import { useUploadImage } from '../../hooks/UseUploadImage';
 import { EditModeControl } from './editMode';
 import { Management } from './management';
 import { Button } from '../button';
@@ -134,48 +134,9 @@ export function OrganisationForm(props) {
 
 export function OrgInformation(props) {
   const token = useSelector((state) => state.auth.get('token'));
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
+  const [uploadError, uploading, uploadImg] = useUploadImage();
   const labelClasses = 'db pt3 pb2';
   const fieldClasses = 'blue-grey w-100 pv3 ph2 input-reset ba b--grey-light bg-transparent';
-
-  const uploadImage = (file, onChange) => {
-    const fileInfo = file.files[0];
-    const promise = new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(fileInfo);
-      reader.onload = () => {
-        if (!!reader.result) {
-          resolve(reader.result);
-        } else {
-          reject(Error('Failed converting to base64'));
-        }
-      };
-    });
-    promise.then(
-      (result) => {
-        const payload = JSON.stringify({
-          mime: fileInfo.type,
-          data: result.split('base64,')[1],
-          filename: fileInfo.name,
-        });
-        setUploading(true);
-        pushToLocalJSONAPI('system/image-upload/', payload, token)
-          .then((res) => {
-            onChange(res.url);
-            setUploading(false);
-            setUploadError(null);
-          })
-          .catch((e) => {
-            setUploadError(e);
-            setUploading(false);
-          });
-      },
-      (err) => {
-        setUploadError(err);
-      },
-    );
-  };
 
   return (
     <>
@@ -193,6 +154,12 @@ export function OrgInformation(props) {
       </div>
       <div className="cf">
         <label className={labelClasses}>
+          <FormattedMessage {...messages.description} />
+        </label>
+        <Field name="description" component="textarea" className={fieldClasses} />
+      </div>
+      <div className="cf">
+        <label className={labelClasses}>
           <FormattedMessage {...messages.image} />
         </label>
         {IMAGE_UPLOAD_SERVICE ? (
@@ -203,7 +170,7 @@ export function OrgInformation(props) {
                   type="file"
                   multiple={false}
                   accept="image/png, image/jpeg, image/webp"
-                  onChange={(e) => uploadImage(e.target, fieldProps.input.onChange)}
+                  onChange={(e) => uploadImg(e.target.files[0], fieldProps.input.onChange, token)}
                 />
                 <ReactPlaceholder
                   type="media"

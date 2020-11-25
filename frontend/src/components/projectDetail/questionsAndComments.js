@@ -1,115 +1,62 @@
-import React, { useLayoutEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import ReactTextareaAutocomplete from '@webscopeio/react-textarea-autocomplete';
 import { FormattedMessage } from 'react-intl';
 
 import messages from './messages';
 import { RelativeTimeWithUnit } from '../../utils/formattedRelativeTime';
 import { PaginatorLine } from '../paginator';
 import { Button } from '../button';
+import { CommentInputField } from '../comments/commentInput';
+import { MessageStatus } from '../comments/status';
 import { CurrentUserAvatar, UserAvatar } from '../user/avatar';
-import { htmlFromMarkdown } from '../../utils/htmlFromMarkdown';
+import { htmlFromMarkdown, formatUserNamesToLink } from '../../utils/htmlFromMarkdown';
 import { pushToLocalJSONAPI, fetchLocalJSONAPI } from '../../network/genericJSONRequest';
+import '@webscopeio/react-textarea-autocomplete/style.css';
 
-const formatUserNamesToLink = (text) => {
-  const regex = /@\[([^\]]+)\]/gi;
-  // Find usernames with a regular expression. They all start with '[@' and end with ']'
-  const usernames = text && text.match(regex);
-  if (usernames) {
-    for (let i = 0; i < usernames.length; i++) {
-      // Strip off the first two characters: '@['
-      let username = usernames[i].substring(2, usernames[i].length);
-      // Strip off the last character
-      username = username.substring(0, username.length - 1);
-      text = text.replace(
-        usernames[i],
-        '<a class="pointer blue-grey b underline" href="/users/' +
-          username +
-          '">' +
-          username +
-          '</a>',
-      );
-    }
-  }
-  return text;
-};
-
-export const UserFetchTextarea = ({ value, setValueFn, token }) => {
-  const fetchUsers = async (user) => {
-    const url = `users/queries/filter/${user}/`;
-
-    let userItems;
-    try {
-      const res = await fetchLocalJSONAPI(url, token);
-      userItems = res.usernames.map((u) => {
-        return { name: u };
-      });
-    } catch (e) {
-      userItems = [];
-    }
-
-    return userItems;
-  };
-
-  const Item = ({ entity: { name } }) => (
-    <div className="w-100 f6 pv2 ph3 f5 tc bg-tan blue-grey hover-bg-blue-grey hover-white pointer">
-      {`${name}`}
-    </div>
-  );
-
-  return (
-    <div className="relative">
-      <ReactTextareaAutocomplete
-        value={value}
-        listClassName="list ma0 pa0 ba b--grey-light bg-blue-grey w-40 overflow-auto absolute bottom--1"
-        onChange={setValueFn}
-        className="w-100 f5 pa2"
-        loadingComponent={() => <span>Loading</span>}
-        rows={3}
-        trigger={{
-          '@': {
-            dataProvider: fetchUsers,
-            component: Item,
-            output: (item, trigger) => '@[' + item.name + ']',
-          },
-        }}
-      />
-    </div>
-  );
-};
-
-const PostProjectComment = ({ token, projectId, setStat }) => {
+const PostProjectComment = ({ token, projectId, updateComments }) => {
   const [comment, setComment] = useState('');
+  const [status, setStatus] = useState('ready');
+
+  useEffect(() => {
+    setStatus('ready');
+  }, [comment]);
 
   const saveComment = () => {
-    if (comment === '') {
-      return null;
+    if (comment) {
+      setStatus('sending');
+      pushToLocalJSONAPI(
+        `projects/${projectId}/comments/`,
+        JSON.stringify({ message: comment }),
+        token,
+      )
+        .then((res) => {
+          updateComments(res);
+          setComment('');
+          setStatus('messageSent');
+        })
+        .catch((e) => setStatus('error'));
     }
-    const url = `projects/${projectId}/comments/`;
-    const body = JSON.stringify({ message: comment });
-
-    pushToLocalJSONAPI(url, body, token).then((res) => {
-      setStat(true);
-      setComment('');
-    });
   };
 
   return (
     <div className="w-90-ns w-100 cf pv4 bg-white center">
-      <div className="fl w-10 ph2 tc pt2">
-        <CurrentUserAvatar className="w3 h3 br-100" />
+      <div className="fl w-10-ns w-20 pt2">
+        <CurrentUserAvatar className="w3 h3 fr ph2 br-100" />
       </div>
-      <div className="fl w-70 h-100">
-        <UserFetchTextarea
-          value={comment}
-          setValueFn={(e) => setComment(e.target.value)}
-          token={token}
-        />
+      <div className="fl w-70-ns w-80 ph1 h-100">
+        <CommentInputField comment={comment} setComment={setComment} enableHashtagPaste={true} />
       </div>
-      <div className="fl w-20 tc pt3">
-        <Button onClick={saveComment} className="bg-red white f5" disabled={comment === ''}>
+      <div className="fl w-20-ns w-100 tc-ns tr pt3 pr0-ns pr1">
+        <Button
+          onClick={saveComment}
+          className="bg-red white f5"
+          disabled={comment === '' || status === 'sending'}
+        >
           <FormattedMessage {...messages.post} />
         </Button>
+        <div className="pv2">
+          <MessageStatus status={status} />
+        </div>
       </div>
     </div>
   );
@@ -117,49 +64,47 @@ const PostProjectComment = ({ token, projectId, setStat }) => {
 
 export const QuestionsAndComments = ({ projectId }) => {
   const token = useSelector((state) => state.auth.get('token'));
-  const [response, setResponse] = useState(null);
+  const [comments, setComments] = useState(null);
   const [page, setPage] = useState(1);
-  const [commentsStat, setStat] = useState(true);
 
   const handlePagination = (val) => {
     setPage(val);
-    setStat(true);
   };
 
-  useLayoutEffect(() => {
-    const getComments = async (pageNo, projectId, perPage, token) => {
-      const url = `projects/${projectId}/comments/?perPage=${perPage}&page=${pageNo}`;
-      const res = await fetchLocalJSONAPI(url, token);
-      setResponse(res);
-    };
-
-    if (commentsStat === true && projectId) {
-      getComments(page, projectId, 5, token);
-      setStat(false);
+  useEffect(() => {
+    if (projectId && page) {
+      fetchLocalJSONAPI(
+        `projects/${projectId}/comments/?perPage=5&page=${page}`,
+        token,
+      ).then((res) => setComments(res));
     }
-  }, [page, projectId, commentsStat, token]);
+  }, [page, projectId, token]);
 
   return (
     <div className="bg-tan">
-      <div className="ph6-l ph4 pb3 w-100 w-70-l">
-        {response && response.chat.length ? (
-          <CommentList comments={response.chat} />
+      <div className="ph6-l ph4-m ph2 pb3 w-100 w-70-l">
+        {comments && comments.chat.length ? (
+          <CommentList comments={comments.chat} />
         ) : (
           <div className="pv4 blue-grey tc">
             <FormattedMessage {...messages.noComments} />
           </div>
         )}
 
-        {response && response.pagination && response.pagination.pages > 0 && (
+        {comments && comments.pagination && comments.pagination.pages > 0 && (
           <PaginatorLine
             activePage={page}
             setPageFn={handlePagination}
-            lastPage={response.pagination.pages}
+            lastPage={comments.pagination.pages}
             className="tr w-90 center pv3"
           />
         )}
-        {token !== null && (
-          <PostProjectComment projectId={projectId} token={token} setStat={setStat} />
+        {token ? (
+          <PostProjectComment projectId={projectId} token={token} updateComments={setComments} />
+        ) : (
+          <div>
+            <p>You need to log in to be able to post comments.</p>
+          </div>
         )}
       </div>
     </div>

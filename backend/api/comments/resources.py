@@ -54,7 +54,7 @@ class CommentsProjectsRestAPI(Resource):
         """
         authenticated_user_id = token_auth.current_user()
         if UserService.is_user_blocked(authenticated_user_id):
-            return "User is on read only mode", 403
+            return {"Error": "User is on read only mode."}, 403
 
         try:
             chat_dto = ChatMessageDTO(request.get_json())
@@ -112,7 +112,7 @@ class CommentsProjectsRestAPI(Resource):
                 description: Internal Server Error
         """
         try:
-            ProjectService.get_project_by_id(project_id)
+            ProjectService.exists(project_id)
         except NotFound as e:
             current_app.logger.error(f"Error validating project: {str(e)}")
             return {"Error": "Project not found"}, 404

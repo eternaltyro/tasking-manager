@@ -4,11 +4,12 @@ from typing import Optional
 from cachetools import TTLCache, cached
 
 import geojson
+import datetime
 from flask import current_app
 from geoalchemy2 import Geometry
-import sqlalchemy
-from sqlalchemy.sql.expression import cast
-from sqlalchemy import text, desc, func, Time
+from geoalchemy2.shape import to_shape
+from sqlalchemy.sql.expression import cast, or_
+from sqlalchemy import text, desc, func, Time, orm, literal
 from shapely.geometry import shape
 from sqlalchemy.dialects.postgresql import ARRAY
 import requests
@@ -56,8 +57,6 @@ from backend.models.postgis.utils import (
     timestamp,
     ST_Centroid,
     NotFound,
-    ST_X,
-    ST_Y,
 )
 from backend.services.grid.grid_service import GridService
 from backend.models.postgis.interests import Interest, project_interests
@@ -151,8 +150,8 @@ class Project(db.Model):
     id_presets = db.Column(ARRAY(db.String))
     last_updated = db.Column(db.DateTime, default=timestamp)
     license_id = db.Column(db.Integer, db.ForeignKey("licenses.id", name="fk_licenses"))
-    geometry = db.Column(Geometry("MULTIPOLYGON", srid=4326))
-    centroid = db.Column(Geometry("POINT", srid=4326))
+    geometry = db.Column(Geometry("MULTIPOLYGON", srid=4326), nullable=False)
+    centroid = db.Column(Geometry("POINT", srid=4326), nullable=False)
     country = db.Column(ARRAY(db.String), default=[])
     task_creation_mode = db.Column(
         db.Integer, default=TaskCreationMode.GRID.value, nullable=False
@@ -173,8 +172,6 @@ class Project(db.Model):
         default=[
             Editors.ID.value,
             Editors.JOSM.value,
-            Editors.POTLATCH_2.value,
-            Editors.FIELD_PAPERS.value,
             Editors.CUSTOM.value,
         ],
         index=True,
@@ -185,8 +182,6 @@ class Project(db.Model):
         default=[
             Editors.ID.value,
             Editors.JOSM.value,
-            Editors.POTLATCH_2.value,
-            Editors.FIELD_PAPERS.value,
             Editors.CUSTOM.value,
         ],
         index=True,
@@ -259,25 +254,17 @@ class Project(db.Model):
     def set_country_info(self):
         """ Sets the default country based on centroid"""
 
-        lat, lng = (
-            db.session.query(
-                cast(ST_Y(Project.centroid), sqlalchemy.String),
-                cast(ST_X(Project.centroid), sqlalchemy.String),
-            )
-            .filter(Project.id == self.id)
-            .one()
+        centroid = to_shape(self.centroid)
+        lat, lng = (centroid.y, centroid.x)
+        url = "{0}/reverse?format=jsonv2&lat={1}&lon={2}&accept-language=en".format(
+            current_app.config["OSM_NOMINATIM_SERVER_URL"], lat, lng
         )
-        url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={0}&lon={1}".format(
-            lat, lng
-        )
-        country_info = requests.get(url)
-        country_info_json = country_info.content.decode("utf8").replace("'", '"')
-        # Load the JSON to a Python list & dump it back out as formatted JSON
-        data = json.loads(country_info_json)
-        if data["address"].get("country") is not None:
-            self.country = [data["address"]["country"]]
-        else:
-            self.country = [data["address"]["county"]]
+        try:
+            country_info = requests.get(url).json()  # returns a dict
+            if country_info["address"].get("country") is not None:
+                self.country = [country_info["address"]["country"]]
+        except (KeyError, AttributeError, requests.exceptions.ConnectionError):
+            pass
 
         self.save()
 
@@ -294,7 +281,7 @@ class Project(db.Model):
     def clone(project_id: int, author_id: int):
         """ Clone project """
 
-        orig = Project.get(project_id)
+        orig = Project.query.get(project_id)
         if orig is None:
             raise NotFound()
 
@@ -316,8 +303,6 @@ class Project(db.Model):
                 "created": timestamp(),
                 "author_id": author_id,
                 "status": ProjectStatus.DRAFT.value,
-                "geometry": None,
-                "centroid": None,
             }
         )
 
@@ -344,13 +329,19 @@ class Project(db.Model):
                 orig_changeset, ""
             )
 
-        # Copy array relationships.
-        for field in ["interests", "campaign", "teams"]:
+        # Populate teams, interests and campaigns
+        teams = []
+        for team in orig.teams:
+            team_data = team.__dict__.copy()
+            team_data.pop("_sa_instance_state")
+            team_data.update({"project_id": new_proj.id})
+            teams.append(ProjectTeams(**team_data))
+        new_proj.teams = teams
+
+        for field in ["interests", "campaign"]:
             value = getattr(orig, field)
             setattr(new_proj, field, value)
-
         new_proj.custom_editor = orig.custom_editor
-        db.session.commit()
 
         return new_proj
 
@@ -361,7 +352,9 @@ class Project(db.Model):
         :param project_id: project ID in scope
         :return: Project if found otherwise None
         """
-        return Project.query.get(project_id)
+        return Project.query.options(
+            orm.noload("tasks"), orm.noload("messages"), orm.noload("project_chat")
+        ).get(project_id)
 
     def update(self, project_dto: ProjectDTO):
         """ Updates project from DTO """
@@ -411,11 +404,13 @@ class Project(db.Model):
             validation_editors_array.append(Editors[validation_editor].value)
         self.validation_editors = validation_editors_array
         self.country = project_dto.country_tag
+
         # Add list of allowed users, meaning the project can only be mapped by users in this list
         if hasattr(project_dto, "allowed_users"):
             self.allowed_users = []  # Clear existing relationships then re-insert
             for user in project_dto.allowed_users:
                 self.allowed_users.append(user)
+
         # Update teams and projects relationship.
         self.teams = []
         if hasattr(project_dto, "project_teams") and project_dto.project_teams:
@@ -427,6 +422,7 @@ class Project(db.Model):
 
                 role = TeamRoles[team_dto.role].value
                 ProjectTeams(project=self, team=team, role=role)
+
         # Set Project Info for all returned locales
         for dto in project_dto.project_info_locales:
 
@@ -458,7 +454,16 @@ class Project(db.Model):
             if self.custom_editor:
                 self.custom_editor.delete()
 
-        self.campaign = [Campaign.query.get(c.id) for c in project_dto.campaigns]
+        # handle campaign update
+        try:
+            new_ids = [c.id for c in project_dto.campaigns]
+            new_ids.sort()
+        except TypeError:
+            new_ids = []
+        current_ids = [c.id for c in self.campaign]
+        current_ids.sort()
+        if new_ids != current_ids:
+            self.campaign = Campaign.query.filter(Campaign.id.in_(new_ids)).all()
 
         if project_dto.mapping_permission:
             self.mapping_permission = MappingPermission[
@@ -470,10 +475,20 @@ class Project(db.Model):
                 project_dto.validation_permission.upper()
             ].value
 
-        # Update Interests.
-        self.interests = []
-        if project_dto.interests:
-            self.interests = [Interest.query.get(i.id) for i in project_dto.interests]
+        # handle interests update
+        try:
+            new_ids = [c.id for c in project_dto.interests]
+            new_ids.sort()
+        except TypeError:
+            new_ids = []
+        current_ids = [c.id for c in self.interests]
+        current_ids.sort()
+        if new_ids != current_ids:
+            self.interests = Interest.query.filter(Interest.id.in_(new_ids)).all()
+
+        # try to update country info if that information is not present
+        if not self.country:
+            self.set_country_info()
 
         db.session.commit()
 
@@ -481,6 +496,12 @@ class Project(db.Model):
         """ Deletes the current model from the DB """
         db.session.delete(self)
         db.session.commit()
+
+    @staticmethod
+    def exists(project_id):
+        query = Project.query.filter(Project.id == project_id).exists()
+
+        return db.session.query(literal(True)).filter(query).scalar()
 
     def is_favorited(self, user_id: int) -> bool:
         user = User.query.get(user_id)
@@ -565,11 +586,20 @@ class Project(db.Model):
         stats_dto.time_spent_validating = 0
         stats_dto.total_time_spent = 0
 
-        query = """SELECT SUM(TO_TIMESTAMP(action_text, 'HH24:MI:SS')::TIME) FROM task_history
-                   WHERE (action='LOCKED_FOR_MAPPING' or action='AUTO_UNLOCKED_FOR_MAPPING')
-                   and user_id = :user_id and project_id = :project_id;"""
-        total_mapping_time = db.engine.execute(
-            text(query), user_id=user_id, project_id=self.id
+        total_mapping_time = (
+            db.session.query(
+                func.sum(
+                    cast(func.to_timestamp(TaskHistory.action_text, "HH24:MI:SS"), Time)
+                )
+            )
+            .filter(
+                or_(
+                    TaskHistory.action == "LOCKED_FOR_MAPPING",
+                    TaskHistory.action == "AUTO_UNLOCKED_FOR_MAPPING",
+                )
+            )
+            .filter(TaskHistory.user_id == user_id)
+            .filter(TaskHistory.project_id == self.id)
         )
         for time in total_mapping_time:
             total_mapping_time = time[0]
@@ -640,67 +670,139 @@ class Project(db.Model):
         )
         centroid_geojson = db.session.scalar(self.centroid.ST_AsGeoJSON())
         project_stats.aoi_centroid = geojson.loads(centroid_geojson)
-        unique_mappers = (
-            TaskHistory.query.filter(
-                TaskHistory.action == "LOCKED_FOR_MAPPING",
-                TaskHistory.project_id == self.id,
-            )
-            .distinct(TaskHistory.user_id)
-            .count()
-        )
-        unique_validators = (
-            TaskHistory.query.filter(
-                TaskHistory.action == "LOCKED_FOR_VALIDATION",
-                TaskHistory.project_id == self.id,
-            )
-            .distinct(TaskHistory.user_id)
-            .count()
-        )
         project_stats.total_time_spent = 0
         project_stats.total_mapping_time = 0
         project_stats.total_validation_time = 0
         project_stats.average_mapping_time = 0
         project_stats.average_validation_time = 0
 
-        query = """SELECT SUM(TO_TIMESTAMP(action_text, 'HH24:MI:SS')::TIME) FROM task_history
-                   WHERE (action='LOCKED_FOR_MAPPING' or action='AUTO_UNLOCKED_FOR_MAPPING')
-                   and project_id = :project_id;"""
-        total_mapping_time = db.engine.execute(text(query), project_id=self.id)
-        for row in total_mapping_time:
-            total_mapping_time = row[0]
-            if total_mapping_time:
-                total_mapping_seconds = total_mapping_time.total_seconds()
-                project_stats.total_mapping_time = total_mapping_seconds
-                project_stats.total_time_spent += project_stats.total_mapping_time
-                if unique_mappers:
-                    average_mapping_time = total_mapping_seconds / unique_mappers
-                    project_stats.average_mapping_time = average_mapping_time
-
-        query = (
-            TaskHistory.query.with_entities(
-                func.date_trunc("minute", TaskHistory.action_date).label("trn"),
-                func.max(TaskHistory.action_text).label("tm"),
+        total_mapping_time, total_mapping_tasks = (
+            db.session.query(
+                func.sum(
+                    cast(func.to_timestamp(TaskHistory.action_text, "HH24:MI:SS"), Time)
+                ),
+                func.count(TaskHistory.action),
+            )
+            .filter(
+                or_(
+                    TaskHistory.action == "LOCKED_FOR_MAPPING",
+                    TaskHistory.action == "AUTO_UNLOCKED_FOR_MAPPING",
+                )
             )
             .filter(TaskHistory.project_id == self.id)
-            .filter(TaskHistory.action == "LOCKED_FOR_VALIDATION")
-            .group_by("trn")
+            .one()
+        )
+
+        if total_mapping_tasks > 0:
+            total_mapping_time = total_mapping_time.total_seconds()
+            project_stats.total_mapping_time = total_mapping_time
+            project_stats.average_mapping_time = (
+                total_mapping_time / total_mapping_tasks
+            )
+            project_stats.total_time_spent += total_mapping_time
+
+        total_validation_time, total_validation_tasks = (
+            db.session.query(
+                func.sum(
+                    cast(func.to_timestamp(TaskHistory.action_text, "HH24:MI:SS"), Time)
+                ),
+                func.count(TaskHistory.action),
+            )
+            .filter(
+                or_(
+                    TaskHistory.action == "LOCKED_FOR_VALIDATION",
+                    TaskHistory.action == "AUTO_UNLOCKED_FOR_VALIDATION",
+                )
+            )
+            .filter(TaskHistory.project_id == self.id)
+            .one()
+        )
+
+        if total_validation_tasks > 0:
+            total_validation_time = total_validation_time.total_seconds()
+            project_stats.total_validation_time = total_validation_time
+            project_stats.average_validation_time = (
+                total_validation_time / total_validation_tasks
+            )
+            project_stats.total_time_spent += total_validation_time
+
+        actions = []
+        if project_stats.average_mapping_time <= 0:
+            actions.append(TaskStatus.LOCKED_FOR_MAPPING.name)
+        if project_stats.average_validation_time <= 0:
+            actions.append(TaskStatus.LOCKED_FOR_VALIDATION.name)
+
+        zoom_levels = []
+        # Check that averages are non-zero.
+        if len(actions) != 0:
+            zoom_levels = (
+                Task.query.with_entities(Task.zoom.distinct())
+                .filter(Task.project_id == self.id)
+                .all()
+            )
+            zoom_levels = [z[0] for z in zoom_levels]
+
+        # Validate project has arbitrary tasks.
+        is_square = True
+        if None in zoom_levels:
+            is_square = False
+        sq = (
+            TaskHistory.query.with_entities(
+                Task.zoom,
+                TaskHistory.action,
+                (
+                    cast(func.to_timestamp(TaskHistory.action_text, "HH24:MI:SS"), Time)
+                ).label("ts"),
+            )
+            .filter(Task.is_square == is_square)
+            .filter(TaskHistory.project_id == Task.project_id)
+            .filter(TaskHistory.task_id == Task.id)
+            .filter(TaskHistory.action.in_(actions))
+        )
+        if is_square is True:
+            sq = sq.filter(Task.zoom.in_(zoom_levels))
+
+        sq = sq.subquery()
+
+        nz = (
+            db.session.query(sq.c.zoom, sq.c.action, sq.c.ts)
+            .filter(sq.c.ts > datetime.time(0))
+            .limit(10000)
             .subquery()
         )
-        total_validation_time = db.session.query(
-            func.sum(cast(func.to_timestamp(query.c.tm, "HH24:MI:SS"), Time))
-        ).all()
 
-        for row in total_validation_time:
-            total_validation_time = row[0]
-            if total_validation_time:
-                total_validation_seconds = total_validation_time.total_seconds()
-                project_stats.total_validation_time = total_validation_seconds
-                project_stats.total_time_spent += project_stats.total_validation_time
-                if unique_validators:
-                    average_validation_time = (
-                        total_validation_seconds / unique_validators
-                    )
-                    project_stats.average_validation_time = average_validation_time
+        if project_stats.average_mapping_time <= 0:
+            mapped_avg = (
+                db.session.query(nz.c.zoom, (func.avg(nz.c.ts)).label("avg"))
+                .filter(nz.c.action == TaskStatus.LOCKED_FOR_MAPPING.name)
+                .group_by(nz.c.zoom)
+                .all()
+            )
+            mapping_time = sum([t.avg.total_seconds() for t in mapped_avg]) / len(
+                mapped_avg
+            )
+            project_stats.average_mapping_time = mapping_time
+
+        if project_stats.average_validation_time <= 0:
+            val_avg = (
+                db.session.query(nz.c.zoom, (func.avg(nz.c.ts)).label("avg"))
+                .filter(nz.c.action == TaskStatus.LOCKED_FOR_VALIDATION.name)
+                .group_by(nz.c.zoom)
+                .all()
+            )
+            validation_time = sum([t.avg.total_seconds() for t in val_avg]) / len(
+                val_avg
+            )
+            project_stats.average_validation_time = validation_time
+
+        time_to_finish_mapping = (
+            self.total_tasks
+            - (self.tasks_mapped + self.tasks_bad_imagery + self.tasks_validated)
+        ) * project_stats.average_mapping_time
+        project_stats.time_to_finish_mapping = time_to_finish_mapping
+        project_stats.time_to_finish_validating = (
+            self.total_tasks - (self.tasks_validated + self.tasks_bad_imagery)
+        ) * project_stats.average_validation_time + time_to_finish_mapping
 
         return project_stats
 
@@ -1025,6 +1127,7 @@ class Project(db.Model):
             db.session.query(func.unnest(Project.country).label("country"))
             .distinct()
             .order_by("country")
+            .all()
         )
         tags_dto = TagsDTO()
         tags_dto.tags = [r[0] for r in query]

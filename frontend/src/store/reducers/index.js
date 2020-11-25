@@ -7,6 +7,8 @@ import { tasksReducer } from './tasks';
 import { userReducer } from './user';
 import { projectReducer } from './project';
 import { loaderReducer } from './loader';
+import { editorReducer } from './editor';
+import { orgBarVisibilityReducer } from './orgTopBar';
 
 export default combineReducers({
   preferences: preferencesReducer,
@@ -16,4 +18,6 @@ export default combineReducers({
   user: userReducer,
   project: projectReducer,
   loader: loaderReducer,
+  editor: editorReducer,
+  orgBarVisibility: orgBarVisibilityReducer,
 });

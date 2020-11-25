@@ -13,7 +13,8 @@ class UserContribution(Model):
     mapped = IntType()
     validated = IntType()
     total = IntType()
-    task_ids = ListType(IntType, serialized_name="taskIds")
+    mapped_tasks = ListType(IntType, serialized_name="mappedTasks")
+    validated_tasks = ListType(IntType, serialized_name="validatedTasks")
     name = StringType()
     date_registered = DateType(serialized_name="dateRegistered")
 
@@ -78,20 +79,20 @@ class ProjectLastActivityDTO(Model):
 
 
 class OrganizationStatsDTO(Model):
-    def __init__(self, tup):
+    def __init__(self, row):
         super().__init__()
-        self.organisation = tup[0]
-        self.projects_created = tup[1]
+        self.organisation = row[0]
+        self.projects_created = row[1]
 
     organisation = StringType()
     projects_created = IntType(serialized_name="projectsCreated")
 
 
 class CampaignStatsDTO(Model):
-    def __init__(self, tup):
+    def __init__(self, row):
         super().__init__()
-        self.campaign = tup[0]
-        self.projects_created = tup[1]
+        self.campaign = row[0]
+        self.projects_created = row[1]
 
     campaign = StringType()
     projects_created = IntType(serialized_name="projectsCreated")
@@ -102,7 +103,7 @@ class HomePageStatsDTO(Model):
 
     def __init__(self):
         super().__init__()
-        self.organizations = []
+        self.organisations = []
         self.campaigns = []
 
     mappers_online = IntType(serialized_name="mappersOnline")
@@ -112,7 +113,6 @@ class HomePageStatsDTO(Model):
     total_mappers = IntType(serialized_name="totalMappers")
     total_validators = IntType(serialized_name="totalValidators")
     total_projects = IntType(serialized_name="totalProjects")
-    # total_area = FloatType(serialized_name='totalArea')
     total_mapped_area = FloatType(serialized_name="totalMappedArea")
     total_validated_area = FloatType(serialized_name="totalValidatedArea")
     total_organisations = IntType(serialized_name="totalOrganisations")

@@ -20,8 +20,14 @@ class EnvironmentConfig:
     if APP_BASE_URL.endswith("/"):
         APP_BASE_URL = APP_BASE_URL[:-1]
 
-    FRONTEND_BASE_URL = os.getenv("TM_FRONTEND_BASE_URL", APP_BASE_URL)
     API_VERSION = os.getenv("TM_APP_API_VERSION", "v2")
+    ORG_CODE = os.getenv("TM_ORG_CODE", "")
+    ORG_NAME = os.getenv("TM_ORG_NAME", "")
+    ORG_LOGO = os.getenv(
+        "TM_ORG_LOGO",
+        "https://cdn.hotosm.org/tasking-manager/uploads/1588741335578_hot-logo.png",
+    )
+    ENVIRONMENT = os.getenv("TM_ENVIRONMENT", "")
     # The default tag used in the OSM changeset comment
     DEFAULT_CHANGESET_COMMENT = os.getenv("TM_DEFAULT_CHANGESET_COMMENT", None)
 
@@ -33,6 +39,12 @@ class EnvironmentConfig:
 
     # A freely definable secret key for connecting the front end with the back end
     SECRET_KEY = os.getenv("TM_SECRET", None)
+
+    # OSM API, Nomimatim URLs
+    OSM_SERVER_URL = os.getenv("OSM_SERVER_URL", "https://www.openstreetmap.org")
+    OSM_NOMINATIM_SERVER_URL = os.getenv(
+        "OSM_NOMINATIM_SERVER_URL", "https://nominatim.openstreetmap.org"
+    )
 
     # Database connection
     POSTGRES_USER = os.getenv("POSTGRES_USER", None)
@@ -77,22 +89,22 @@ class EnvironmentConfig:
     SUPPORTED_LANGUAGES = {
         "codes": os.getenv(
             "TM_SUPPORTED_LANGUAGES_CODES",
-            "ar, cs, de, en, es, fa_IR, fr, he, hu, id, it, ja, mg, ml, nl_NL, pt, pt_BR, sv, sw, tl, tr, uk, zh_TW",  # noqa
+            "ar, cs, de, el, en, es, fa_IR, fr, he, hu, id, it, ja, mg, ml, nl_NL, pt, pt_BR, ru, sv, sw, tl, tr, uk, zh_TW",  # noqa
         ),
         "languages": os.getenv(
             "TM_SUPPORTED_LANGUAGES",
-            "عربى, Česky, Deutsch, English, Español, فارسی, Français, עברית, Magyar, Indonesia, Italiano, 日本語, Malagasy, Malayalam, Nederlands, Português, Português (Brasil), Svenska, Kiswahili, Filipino (Tagalog), Türkçe, Українська, 中国台湾",  # noqa
+            "عربى, Česky, Deutsch, Ελληνικά, English, Español, فارسی, Français, עברית, Magyar, Indonesia, Italiano, 日本語, Malagasy, Malayalam, Nederlands, Português, Português (Brasil), Русский язык, Svenska, Kiswahili, Filipino (Tagalog), Türkçe, Українська, 中国台湾",  # noqa
         ),
     }
 
     # Connection to OSM authentification system
     OSM_OAUTH_SETTINGS = {
-        "base_url": "https://www.openstreetmap.org/api/0.6/",
+        "base_url": "{}/api/0.6/".format(OSM_SERVER_URL),
         "consumer_key": os.getenv("TM_CONSUMER_KEY", None),
         "consumer_secret": os.getenv("TM_CONSUMER_SECRET", None),
-        "request_token_url": "https://www.openstreetmap.org/oauth/request_token",
-        "access_token_url": "https://www.openstreetmap.org/oauth/access_token",
-        "authorize_url": "https://www.openstreetmap.org/oauth/authorize",
+        "request_token_url": "{}/oauth/request_token".format(OSM_SERVER_URL),
+        "access_token_url": "{}/oauth/access_token".format(OSM_SERVER_URL),
+        "authorize_url": "{}/oauth/authorize".format(OSM_SERVER_URL),
     }
 
     # Some more definitions (not overridable)
@@ -104,3 +116,6 @@ class EnvironmentConfig:
     # Image upload Api
     IMAGE_UPLOAD_API_KEY = os.getenv("TM_IMAGE_UPLOAD_API_KEY", None)
     IMAGE_UPLOAD_API_URL = os.getenv("TM_IMAGE_UPLOAD_API_URL", None)
+
+    # Sentry backend DSN
+    SENTRY_BACKEND_DSN = os.getenv("TM_SENTRY_BACKEND_DSN", None)
